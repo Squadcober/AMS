@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json(cached.data);
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     const player = await db.collection('ams-player-data').findOne(
@@ -53,7 +53,7 @@ export async function PATCH(
 ) {
   try {
     const updates = await request.json();
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // Get current player data

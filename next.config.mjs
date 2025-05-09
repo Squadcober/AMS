@@ -66,6 +66,16 @@ const nextConfig = {
         'next/dynamic': 'next/dynamic',
       });
     }
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "kerberos": false,
+      "@mongodb-js/zstd": false, 
+      "@aws-sdk/credential-providers": false,
+      "gcp-metadata": false,
+      "snappy": false,
+      "socks": false,
+      "aws4": false
+    };
     return config;
   }
 }

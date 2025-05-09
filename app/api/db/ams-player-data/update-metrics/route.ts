@@ -1,5 +1,8 @@
+'use server'
+
+
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(request: NextRequest) {
@@ -13,7 +16,7 @@ export async function PATCH(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // Calculate overall rating based on attributes

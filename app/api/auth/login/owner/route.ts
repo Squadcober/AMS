@@ -1,3 +1,6 @@
+'use server'
+
+
 import { NextRequest, NextResponse } from 'next/server';
 import { sign } from 'jsonwebtoken';
 import { cookies } from 'next/headers';

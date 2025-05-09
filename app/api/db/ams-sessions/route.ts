@@ -1,11 +1,10 @@
+'use server'
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 // Add these exports for dynamic API routes
-export const dynamic = 'force-dynamic';
-export const revalidate = false;
-export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {

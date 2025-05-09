@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
-import { getDatabase } from '@/lib/mongodb';
+import { getClientPromise, getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function GET(
@@ -8,9 +7,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
-
     const user = await db.collection('ams-users').findOne(
       { id: params.id },
       { projection: { password: 0 } }  // Exclude password
@@ -38,7 +36,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     const result = await db.collection('ams-users').deleteOne({

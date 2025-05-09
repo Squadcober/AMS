@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+'use server'
 
-export const dynamic = 'force-dynamic';
-export const revalidate = false;
-export const fetchCache = 'force-no-store';
+import { NextRequest, NextResponse } from 'next/server';
+import { getClientPromise } from '@/lib/mongodb';
+
+
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const academyId = searchParams.get('academyId');
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // Ensure collection exists
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     const { _id, ...updateData } = data; // Exclude _id from the update payload

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 // Add error handling utility
 function getErrorMessage(error: unknown): string {
@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: { collection: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     console.log('Attempting to connect to database:', process.env.MONGODB_DB);
     
     const db = client.db(process.env.MONGODB_DB);
@@ -41,7 +41,7 @@ export async function POST(
 ) {
   try {
     console.log('Starting POST operation for collection:', params.collection);
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     const collection = db.collection(params.collection);
     

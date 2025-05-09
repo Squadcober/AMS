@@ -1,9 +1,12 @@
+'use server'
+
+
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 export async function POST() {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     await db.createCollection('ams-achievement', {

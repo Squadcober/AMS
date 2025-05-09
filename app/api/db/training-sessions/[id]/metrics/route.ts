@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(
@@ -16,7 +16,7 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // First update the session metrics

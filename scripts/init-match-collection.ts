@@ -1,9 +1,9 @@
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 async function initMatchCollection() {
   try {
     console.log('Connecting to MongoDB...');
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // Check if collection exists

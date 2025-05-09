@@ -1,13 +1,14 @@
-import { MongoClient, ObjectId } from 'mongodb'
-import clientPromise, { getCollection } from './mongodb'
-import type { Academy, Player, User, Session } from '@/types/models'
+'use server'
+
+import { getCollection, getClientPromise } from './mongodb'
+import type { Academy, User, Session } from '@/types/models'
 import { cache } from 'react'
 
 export const getDb = cache(async () => {
   if (typeof window !== 'undefined') {
     throw new Error('Database access not allowed on client side')
   }
-  const client = await clientPromise
+  const client = await getClientPromise()
   return client.db(process.env.MONGODB_DB)
 })
 
@@ -25,7 +26,7 @@ export async function getById(collectionName: string, id: string) {
   return response.json();
 }
 
-export async function create(collectionName: string, data: any) {
+export async function create(collectionName: string, data: Record<string, unknown>) {
   const response = await fetch(`/api/db/${collectionName}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -35,7 +36,7 @@ export async function create(collectionName: string, data: any) {
   return response.json();
 }
 
-export async function update(collectionName: string, id: string, data: any) {
+export async function update(collectionName: string, id: string, data: Record<string, unknown>) {
   const response = await fetch(`/api/db/${collectionName}/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -64,7 +65,7 @@ export async function remove(collectionName: string, id: string) {
   }
 }
 
-export async function getByFilter(collectionName: string, filter: any) {
+export async function getByFilter(collectionName: string, filter: Record<string, string | number | boolean>) {
   const params = new URLSearchParams();
   Object.entries(filter).forEach(([key, value]) => {
     params.append(key, String(value));
@@ -159,7 +160,7 @@ export async function getPlayerByUserId(username: string) {
   }
 }
 
-export async function updatePlayerAttributes(playerId: string, attributes: any) {
+export async function updatePlayerAttributes(playerId: string, attributes: Record<string, unknown>) {
   try {
     const response = await fetch(`/api/db/ams-player-data/${playerId}`, {
       method: 'PUT',
@@ -174,7 +175,7 @@ export async function updatePlayerAttributes(playerId: string, attributes: any) 
   }
 }
 
-export async function createPlayer(playerData: any) {
+export async function createPlayer(playerData: Record<string, unknown>) {
   try {
     const response = await fetch('/api/db/ams-player-data', {
       method: 'POST',
@@ -201,7 +202,7 @@ export async function getTrainingData(playerId: string) {
   }
 }
 
-export async function saveTrainingData(data: any) {
+export async function saveTrainingData(data: Record<string, unknown>) {
   try {
     const response = await fetch('/api/db/ams-training', {
       method: 'POST',

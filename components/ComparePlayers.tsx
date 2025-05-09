@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { usePlayers } from "@/contexts/PlayerContext"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { usePlayers } from "../contexts/PlayerContext"
 import { Radar } from "react-chartjs-2"
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from "chart.js"
 

@@ -1,5 +1,7 @@
+'use server'
+
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(
@@ -9,7 +11,7 @@ export async function PATCH(
   try {
     const { matchId, points, previousPoints } = await request.json();
     
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     // Update the player's match points and add to performance history

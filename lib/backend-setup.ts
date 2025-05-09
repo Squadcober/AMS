@@ -1,7 +1,7 @@
-import { SessionManager } from "@/lib/session-management"
 import { DataExporter } from "@/lib/export-data"
 import { PerformanceAnalytics } from "@/lib/performance-analytics"
-import { TacticalAnalysis } from "@/lib/tactical-analysis"
+// Update the import path below if "@/lib/tactical-analysis" is incorrect
+import { TacticalAnalysis } from "./tactical-analysis"
 
 export class BackendSetup {
   static initialize() {

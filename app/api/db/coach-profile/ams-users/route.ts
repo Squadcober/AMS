@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise, { getDatabase } from '@/lib/mongodb';
+import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 interface User {
@@ -85,8 +85,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
+    const db = await getDatabase();
 
     // Check if username or email already exists
     const existingUser = await db.collection('ams-users').findOne({

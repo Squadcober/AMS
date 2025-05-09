@@ -910,7 +910,7 @@ function SessionsContent() {
         
         for (let i = 0; i < chunkCount; i++) {
           const chunk = StorageUtils.getItem(`${LOCAL_STORAGE_KEY}_${i}`);
-          if (chunk) allSessions = [...allSessions, ...chunk];
+          if (Array.isArray(chunk)) allSessions = [...allSessions, ...chunk];
         }
 
         return allSessions;
@@ -921,7 +921,7 @@ function SessionsContent() {
     };
 
     const savedSessions = loadSessions();
-    const updatedSessions = updateSessionStatus(savedSessions.map(mapSessionPlayers));
+    const updatedSessions = updateSessionStatus((Array.isArray(savedSessions) ? savedSessions : []).map(mapSessionPlayers));
     setSessions(updatedSessions);
   }, [mapSessionPlayers]); // Add mapSessionPlayers to dependencies
 
@@ -936,16 +936,16 @@ function SessionsContent() {
 
     // Use StorageUtils instead of localStorage directly
     const savedSessions = StorageUtils.getItem(LOCAL_STORAGE_KEY) || [];
-    const updatedSessions = updateSessionStatus(savedSessions.map(mapSessionPlayers));
+    const updatedSessions = updateSessionStatus((Array.isArray(savedSessions) ? savedSessions : []).map(mapSessionPlayers));
     setSessions(updatedSessions);
 
     const interval = setInterval(async () => {
-      const updatedSessions = await updateSessionStatus(savedSessions.map(mapSessionPlayers));
+      const updatedSessions = await updateSessionStatus((Array.isArray(savedSessions) ? savedSessions : []).map(mapSessionPlayers));
       setSessions(updatedSessions.map(mapSessionPlayers));
     }, 60000);
     const updateSessions = async () => {
       try {
-        const updatedSessions = await updateSessionStatus(savedSessions.map(mapSessionPlayers));
+        const updatedSessions = await updateSessionStatus((Array.isArray(savedSessions) ? savedSessions : []).map(mapSessionPlayers));
         setSessions(updatedSessions.map(mapSessionPlayers));
       } catch (error) {
         console.error('Error updating sessions:', error);
@@ -2227,7 +2227,7 @@ const handleConfirmExport = async () => {
         
         for (let i = 0; i < chunkCount; i++) {
           const chunk = StorageUtils.getItem(`${LOCAL_STORAGE_KEY}_${i}`);
-          if (chunk) allSessions = [...allSessions, ...chunk];
+          if (Array.isArray(chunk)) allSessions = [...allSessions, ...chunk];
         }
 
         return allSessions;

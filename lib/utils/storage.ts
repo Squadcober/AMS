@@ -1,15 +1,15 @@
 export class StorageUtils {
-  static getItem(key: string): any {
+  static getItem<T = unknown>(key: string): T | null {
     try {
       const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : null;
+      return item ? JSON.parse(item) as T : null;
     } catch (error) {
       console.error(`Error getting item ${key} from storage:`, error);
       return null;
     }
   }
 
-  static setItem(key: string, value: any): void {
+  static setItem<T = unknown>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
@@ -17,13 +17,13 @@ export class StorageUtils {
     }
   }
 
-  static getChunkedData(baseKey: string): any[] {
+  static getChunkedData<T = unknown>(baseKey: string): T[] {
     try {
       const chunkCount = parseInt(localStorage.getItem(`${baseKey}_count`) || "0");
-      let allData: any[] = [];
+      let allData: T[] = [];
       
       for (let i = 0; i < chunkCount; i++) {
-        const chunk = StorageUtils.getItem(`${baseKey}_${i}`);
+        const chunk = StorageUtils.getItem<T[]>(`${baseKey}_${i}`);
         if (chunk) allData = [...allData, ...chunk];
       }
 
@@ -34,7 +34,7 @@ export class StorageUtils {
     }
   }
 
-  static setChunkedData(baseKey: string, data: any[], chunkSize: number = 50): void {
+  static setChunkedData<T = unknown>(baseKey: string, data: T[], chunkSize: number = 50): void {
     try {
       // Clear existing chunks
       const existingCount = parseInt(localStorage.getItem(`${baseKey}_count`) || "0");
@@ -43,7 +43,7 @@ export class StorageUtils {
       }
 
       // Split data into chunks and save
-      const chunks = [];
+      const chunks: T[][] = [];
       for (let i = 0; i < data.length; i += chunkSize) {
         chunks.push(data.slice(i, i + chunkSize));
       }

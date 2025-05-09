@@ -1,5 +1,7 @@
+'use server'
+
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(
@@ -8,7 +10,7 @@ export async function PATCH(
 ) {
   try {
     const { matchId, stats } = await request.json();
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     // First get current player data

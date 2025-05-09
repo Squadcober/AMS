@@ -1,9 +1,9 @@
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 async function initAchievementCollection() {
   try {
     console.log('Connecting to MongoDB...');
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     const collections = await db.listCollections().toArray();

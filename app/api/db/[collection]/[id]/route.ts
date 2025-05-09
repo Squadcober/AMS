@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 // Add helper function at the top
 function getErrorMessage(error: unknown): string {
@@ -13,7 +13,7 @@ export async function GET(
   { params }: { params: { collection: string, id: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     const collection = db.collection(params.collection);
     
@@ -33,7 +33,7 @@ export async function PUT(
   { params }: { params: { collection: string, id: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     const collection = db.collection(params.collection);
     
@@ -58,7 +58,7 @@ export async function DELETE(
   { params }: { params: { collection: string, id: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     const collection = db.collection(params.collection);
 

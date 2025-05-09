@@ -415,7 +415,7 @@ export default function TeamBuilder() {
   const handleExportGamePlan = () => {
     if (!selectedGamePlan) return;
     
-    exportToDoc(selectedGamePlan, players);
+    exportToDoc(selectedGamePlan, players.map(p => ({ ...p, id: p.id.toString() })));
     toast({
       title: "Game Plan Exported",
       description: "Your game plan has been exported as a DOC file",
@@ -423,7 +423,7 @@ export default function TeamBuilder() {
   };
 
   const handleExportAllGamePlans = () => {
-    exportMultipleToDoc(gamePlans, players);
+    exportMultipleToDoc(gamePlans, players.map(p => ({ ...p, id: p.id.toString() })));
     toast({
       title: "Game Plans Exported",
       description: `${gamePlans.length} game plans have been exported as a DOC file`,

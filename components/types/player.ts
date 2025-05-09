@@ -1,5 +1,3 @@
-/// <reference path="./drill.ts" />
-
 import { Drill } from "./drill"
 
 export type PlayerAttributes = {
@@ -60,7 +58,7 @@ export type Player = {
     assists: number
     cleanSheets: number
   }
-  injuries?: any[]
+  injuries?: unknown[]
   galleryImages: string[]
   feesPaid: number
 }

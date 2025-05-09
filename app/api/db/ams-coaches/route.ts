@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
     // If querying for a specific coach
     if (id) {
-      const client = await clientPromise;
+      const client = await getClientPromise();
       const db = client.db(process.env.MONGODB_DB);
 
       const orConditions: Record<string, any>[] = [
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     const coaches = await db

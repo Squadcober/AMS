@@ -1,12 +1,14 @@
+'use server'
+
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { username: string } }
 ) {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     const player = await db.collection('ams-player-data').findOne({
@@ -36,7 +38,7 @@ export async function PATCH(
 ) {
   try {
     const updates = await request.json();
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     const result = await db.collection('ams-player-data').updateOne(

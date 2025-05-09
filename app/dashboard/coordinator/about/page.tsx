@@ -6,7 +6,6 @@ import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, Fil
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { CollateralModal } from "@/components/collateral-modal"
-import type { Collateral as ImportedCollateral, CollateralFile as ImportedCollateralFile } from "@/types/collateral"
 import type React from "react"
 import { toast } from "@/components/ui/use-toast"
 import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
@@ -71,71 +70,6 @@ type AboutPageData = {
   about: string // Add about to the type
 }
 
-const STORAGE_KEY = 'aboutPageData' // Consistent storage key
-
-const INITIAL_COLLATERALS = [
-  {
-    academyId: "",
-    name: "Static Graphics & Images",
-    checked: false,
-    files: [],
-    acceptedTypes: ".jpg,.jpeg,.png,.gif"
-  },
-  {
-    academyId: "",
-    name: "Videos & Motion Graphics",
-    checked: false,
-    files: [],
-    acceptedTypes: ".mp4,.mov,.avi"
-  },
-  {
-    academyId: "",
-    name: "Stories & Interactive Content",
-    checked: false,
-    files: [],
-    acceptedTypes: ".mp4,.jpg,.jpeg,.png"
-  },
-  {
-    academyId: "",
-    name: "Ad Creatives",
-    checked: false,
-    files: [],
-    acceptedTypes: ".jpg,.jpeg,.png,.gif,.mp4"
-  },
-  {
-    academyId: "",
-    name: "Templates & Guides",
-    checked: false,
-    files: [],
-    acceptedTypes: ".pdf,.doc,.docx,.ppt,.pptx"
-  },
-  {
-    academyId: "",
-    name: "Documents & PDFs",
-    checked: false,
-    files: [],
-    acceptedTypes: ".pdf,.doc,.docx"
-  }
-];
-
-const COLLATERAL_TYPES = [
-  {
-    name: "Images & Graphics",
-    acceptedTypes: ".jpg,.jpeg,.png,.gif",
-    icon: FileImage
-  },
-  {
-    name: "Videos",
-    acceptedTypes: ".mp4,.mov,.avi",
-    icon: FileVideo
-  },
-  {
-    name: "Documents",
-    acceptedTypes: ".pdf,.doc,.docx,.ppt,.pptx",
-    icon: FileText
-  }
-];
-
 export default function AboutPage() {
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
@@ -169,7 +103,6 @@ export default function AboutPage() {
   })
   const [selectedCollateral, setSelectedCollateral] = useState<number | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [teamPhotos, setTeamPhotos] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<CollateralFile | null>(null)
   const [aboutData, setAboutData] = useState<AboutData>({
@@ -187,58 +120,13 @@ export default function AboutPage() {
       address: ''
     }
   });
-  const [isLoading, setIsLoading] = useState(true);
 
   // Load data from MongoDB instead of localStorage
   useEffect(() => {
     const fetchAboutData = async () => {
       if (!user?.academyId) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
-        if (!response.ok) throw new Error('Failed to fetch about data');
-        
-        const data = await response.json();
-        
-        if (data && Object.keys(data).length > 0) {
-          // Update both aboutData and formData from MongoDB
-          setAboutData(data);
-          setFormData({
-            logo: data.logos?.[0] || null,
-            color: data.color || "#000000",
-            about: data.description || "",
-            socialMedia: Object.entries(data.contact?.socialMedia || {}).map(([name, url]) => ({
-              name: name.charAt(0).toUpperCase() + name.slice(1),
-              url: url as string
-            })),
-            collaterals: data.collaterals || formData.collaterals.map(col => ({
-              ...col,
-              academyId: user.academyId
-            }))
-          });
-        }
-      } catch (error) {
-        console.error('Error loading about data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load academy information",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAboutData();
-  }, [user?.academyId]);
-
-  useEffect(() => {
-    const fetchAboutData = async () => {
-      if (!user?.academyId) return;
 
       try {
-        setIsLoading(true);
         const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
         if (!response.ok) throw new Error('Failed to fetch about data');
 
@@ -262,8 +150,6 @@ export default function AboutPage() {
           description: "Failed to load academy information",
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -321,17 +207,6 @@ export default function AboutPage() {
       ...prev,
       socialMedia: updatedSocialMedia
     }))
-    setHasUnsavedChanges(true)
-  }
-
-  const handleCollateralClick = (index: number) => {
-    const updatedCollaterals = [...formData.collaterals]
-    updatedCollaterals[index].checked = !updatedCollaterals[index].checked
-    setFormData(prev => ({
-      ...prev,
-      collaterals: updatedCollaterals
-    }))
-    setSelectedCollateral(index)
     setHasUnsavedChanges(true)
   }
 
@@ -416,11 +291,11 @@ export default function AboutPage() {
 
   const handleCancel = async () => {
     if (!user?.academyId) return;
-    
+
     try {
       const response = await fetch(`/api/db/ams-about?academyId=${user.academyId}`);
       if (!response.ok) throw new Error('Failed to fetch about data');
-      
+
       const data = await response.json();
       if (data && Object.keys(data).length > 0) {
         setAboutData(data);
@@ -443,17 +318,10 @@ export default function AboutPage() {
         variant: "destructive",
       });
     }
-    
+
     setIsEditing(false);
     setHasUnsavedChanges(false);
   };
-
-  // Add deleteTeamPhoto function
-  const deleteTeamPhoto = (index: number) => {
-    const newPhotos = [...teamPhotos]
-    newPhotos.splice(index, 1)
-    setTeamPhotos(newPhotos)
-  }
 
   // Add function to handle file click
   const handleFileClick = (file: CollateralFile) => {

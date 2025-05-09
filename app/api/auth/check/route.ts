@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { cookies } from 'next/headers';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       };
       return NextResponse.json({ user });
     } else {
-      const client = await clientPromise;
+      const client = await getClientPromise();
       const db = client.db(process.env.MONGODB_DB);
       // Fetch user from ams-users collection
       const amsUser = await db.collection('ams-users').findOne({

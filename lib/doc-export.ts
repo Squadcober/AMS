@@ -25,7 +25,10 @@ interface FormattedPlayer {
   y: number;
 }
 
-const formatGamePlanForExport = (gamePlan: GamePlan, players: any[]) => {
+const formatGamePlanForExport = (
+  gamePlan: GamePlan,
+  players: Array<{ id: string; name?: string }>
+) => {
   const formattedPlayers: FormattedPlayer[] = [];
   
   Object.entries(gamePlan.positions).forEach(([positionName, position]) => {
@@ -55,7 +58,10 @@ const formatGamePlanForExport = (gamePlan: GamePlan, players: any[]) => {
   };
 };
 
-export const exportToDoc = (gamePlan: GamePlan, players: any[]) => {
+export const exportToDoc = (
+  gamePlan: GamePlan,
+  players: Array<{ id: string; name?: string }>
+) => {
   const formattedGamePlan = formatGamePlanForExport(gamePlan, players);
   
   const content = `
@@ -84,7 +90,10 @@ export const exportToDoc = (gamePlan: GamePlan, players: any[]) => {
   saveAs(blob, fileName);
 };
 
-export const exportMultipleToDoc = (gamePlans: GamePlan[], players: any[]) => {
+export const exportMultipleToDoc = (
+  gamePlans: GamePlan[],
+  players: Array<{ id: string; name?: string }>
+) => {
   const formattedGamePlans = gamePlans.map(plan => formatGamePlanForExport(plan, players));
   
   const content = formattedGamePlans.map(plan => `

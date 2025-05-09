@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const academyId = searchParams.get('academyId');
     const playerId = searchParams.get('playerId');
     
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     const query = {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     
     const result = await db.collection('ams-training').insertOne({

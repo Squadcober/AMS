@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 
 export async function GET() {
   try {
@@ -7,7 +7,7 @@ export async function GET() {
     console.log('URI:', process.env.MONGODB_URI?.substring(0, 20) + '...');
     console.log('Database:', process.env.MONGODB_DB);
     
-    const client = await clientPromise;
+    const client = await getClientPromise();
     console.log('Client connection established');
     
     const db = client.db(process.env.MONGODB_DB);

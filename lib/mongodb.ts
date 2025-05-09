@@ -1,4 +1,6 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+"use server"
+
+import { MongoClient, Collection } from 'mongodb';
 import { LRUCache } from 'lru-cache';
 
 const CACHE_TTL = 30000; // 30 seconds
@@ -7,12 +9,8 @@ const CACHE_SIZE = 100; // Maximum number of cached items
 const cache = new LRUCache({
   max: CACHE_SIZE,
   ttl: CACHE_TTL,
-  updateAgeOnGet: true, // Update TTL when accessed
-  fetchMethod: async (key: string) => {
-    // Implement fetch method for cache misses
-    console.log('Cache miss, fetching from DB:', key);
-    return null;
-  }
+  updateAgeOnGet: true,
+  allowStale: false
 });
 
 if (!process.env.MONGODB_URI) {
@@ -29,7 +27,7 @@ let clientPromise: Promise<MongoClient>;
 
 if (typeof window === 'undefined') {
   if (process.env.NODE_ENV === 'development') {
-    let globalWithMongo = global as typeof globalThis & {
+    const globalWithMongo = global as typeof globalThis & {
       _mongoClientPromise?: Promise<MongoClient>;
     };
 
@@ -70,7 +68,7 @@ export async function connectWithRetry(retries = 3): Promise<MongoClient> {
 
 export async function getDatabase() {
   const client = await connectWithRetry();
-  return client.db(process.env.MONGODB_DB as string);
+  return client.db(process.env.MONGODB_DB || ''); // Add fallback empty string
 }
 
 export async function createIndexes() {
@@ -115,9 +113,9 @@ export async function getCollection(name: string): Promise<Collection> {
   return db.collection(name);
 }
 
-export async function queryCached(key: string, queryFn: () => Promise<any>) {
+export async function queryCached<T>(key: string, queryFn: () => Promise<T>): Promise<T> {
   const cached = cache.get(key);
-  if (cached) return cached;
+  if (cached) return cached as T;
 
   const result = await queryFn();
   cache.set(key, result);
@@ -127,7 +125,7 @@ export async function queryCached(key: string, queryFn: () => Promise<any>) {
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
     const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB as string);
+    const db = client.db(process.env.MONGODB_DB || '');
     await db.command({ ping: 1 });
     return true;
   } catch (error) {
@@ -146,7 +144,7 @@ export async function connectToDatabase() {
 
   try {
     const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB as string);
+    const db = client.db(process.env.MONGODB_DB || '');
     return { client, db };
   } catch (error) {
     console.error('Failed to connect to database:', error);
@@ -154,4 +152,6 @@ export async function connectToDatabase() {
   }
 }
 
-export default clientPromise;
+export async function getClientPromise(): Promise<MongoClient> {
+  return clientPromise;
+}

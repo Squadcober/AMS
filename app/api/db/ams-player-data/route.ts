@@ -1,5 +1,8 @@
+'use server'
+
+
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { calculateOverall, calculateAveragePerformance } from '@/utils/calculations';
 
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
     let query = {};
 
@@ -86,7 +89,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
     // Calculate new overall and average performance

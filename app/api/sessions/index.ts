@@ -6,7 +6,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const { academyId } = req.query
       if (academyId) {
-        const sessions = await getByFilter('sessions', { academyId })
+        const id = Array.isArray(academyId) ? academyId[0] : academyId;
+        const sessions = await getByFilter('sessions', { academyId: id })
         return res.status(200).json(sessions)
       }
       const sessions = await getAll('sessions')

@@ -60,7 +60,7 @@ export interface Session {
   selectedDays?: string[];
   totalOccurrences?: number;
   coachNames?: string[];
-  assignedPlayersData: { id: string, name: string, position: string }[] // Add this new property
+  assignedPlayersData: { id: string, name: string, position: string, photoUrl?: string }[] // Add this new property and photoUrl
   playerMetrics?: {
     [playerId: string]: {
       shooting: number;
@@ -83,6 +83,7 @@ export interface Session {
   occurrenceDate?: string;   // Specific date for this occurrence
   isOccurrence?: boolean;    // Flag to identify if this is a recurring occurrence
   academyId: string; // Add this property
+  isUpdating?: boolean; // Optional flag for UI updates
 }
 
 // Add this interface near the top of the file, after the Session interface
@@ -99,6 +100,7 @@ export interface Batch {
 
 // Update the exportToFile function with better CSV formatting
 const exportToFile = (data: Session[], academyId: string, batchesData: Batch[]) => {
+  // const { user } = useAuth(); // Removed duplicate declaration
   // Filter sessions for current academy
   const academySessions = data.filter(session => session.academyId === academyId);
   
@@ -178,6 +180,7 @@ const MAX_SESSIONS = 50;
 
 const exportAndClearSessions = async (type: 'archive' | 'backup') => {
   try {
+    const { user } = useAuth();
     if (!user?.academyId) {
       toast({
         title: "Error",
@@ -195,6 +198,7 @@ const exportAndClearSessions = async (type: 'archive' | 'backup') => {
     // Generate CSV and trigger download
     const date = new Date().toISOString().split('T')[0];
     const fileName = `sessions_${type}_${date}`;
+    const { batches } = useBatches(); // Add this line to get batches from context
     exportToFile(sessions, user.academyId, batches);
 
     // If it's an archive operation, clear the sessions from the database
@@ -211,8 +215,6 @@ const exportAndClearSessions = async (type: 'archive' | 'backup') => {
       if (!clearResponse.ok) throw new Error('Failed to clear sessions');
 
       // Clear local state
-      setSessions([]);
-      setUnsavedSessions([]);
     }
 
     toast({
@@ -328,8 +330,8 @@ const generateRecurringOccurrences = (session: Session): Session[] => {
         status = 'Upcoming';
       }
 
-      // Create occurrence with truly unique ID
-      const occurrenceId = `${session.id}-${Date.now()}-${occurrenceCounter++}`;
+      // Create occurrence with truly unique numeric ID
+      const occurrenceId = Number(`${session.id}${Date.now()}${occurrenceCounter++}`);
       occurrences.push({
         ...session,
         id: occurrenceId,
@@ -628,7 +630,7 @@ function SessionsContent() {
         if (!isFirstLoad.current) {
           // First, update any changed sessions in place
           setSessions(prev => prev.map(session => {
-            const updatedSession = newData.find(s => s.id === session.id);
+            const updatedSession = newData.find((s: Session) => s.id === session.id);
             if (updatedSession) {
               return {
                 ...session,
@@ -671,7 +673,7 @@ function SessionsContent() {
   // Initial load effect
   useEffect(() => {
     let mounted = true;
-    let retryTimeout: NodeJS.Timeout;
+    let retryTimeout: NodeJS.Timeout | undefined = undefined;
 
     const loadInitialSessions = async () => {
       if (!user?.academyId) {
@@ -1139,7 +1141,7 @@ const handleViewOccurrences = async (parentId: number) => {
 
     // Calculate the status of each occurrence based on date and time
     const now = new Date();
-    const updatedOccurrences = occurrences.map((occurrence) => {
+    const updatedOccurrences = occurrences.map((occurrence: Session) => {
       const occurrenceDate = new Date(occurrence.date);
       const [startHour, startMinute] = occurrence.startTime.split(':').map(Number);
       const [endHour, endMinute] = occurrence.endTime.split(':').map(Number);
@@ -1261,7 +1263,7 @@ const handleViewDetails = async (sessionId: number | string) => {
           session.assignedPlayersData = [];
         }
       } else {
-        session.assignedPlayersData = playerIds.map(id => ({
+        session.assignedPlayersData = playerIds.map((id: string) => ({
           id,
           name: 'Unknown Player',
           position: 'Not specified',
@@ -1275,7 +1277,7 @@ const handleViewDetails = async (sessionId: number | string) => {
     setSessions(prev => prev.map(s => 
       s.id.toString() === sessionId.toString() ? session : s
     ));
-    setViewDetailsSessionId(sessionId);
+    setViewDetailsSessionId(typeof sessionId === 'string' ? parseInt(sessionId) : sessionId);
     setViewDetailsSessionData(session);
 
     // ...existing code...
@@ -1569,7 +1571,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                       <span className="text-cyan-400">
                         {status === "Finished"
                           ? getLastFinishedDate(session) || 'No finished sessions'
-                          : getNextSessionDate(session, session.date, session.recurringEndDate) || 'No upcoming dates'}
+                          : getNextSessionDate(session, session.date, session.recurringEndDate || session.date) || 'No upcoming dates'}
                       </span>
                     )}
                   </TableCell>
@@ -1747,7 +1749,7 @@ const handleViewFinishedOccurrences = async (parentId: number) => {
     // Calculate status for each occurrence based on date and time
     const now = new Date();
     const finishedOccurrences = allOccurrences
-      .map(occurrence => {
+      .map((occurrence: Session) => {
         const occurrenceDate = new Date(occurrence.date);
         const [endHour, endMinute] = occurrence.endTime.split(':').map(Number);
         const sessionEnd = new Date(occurrenceDate);
@@ -1763,7 +1765,7 @@ const handleViewFinishedOccurrences = async (parentId: number) => {
         return null;
       })
       .filter(Boolean) // Remove null values
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date descending
+      .sort((a: Session, b: Session) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date descending
 
     setViewOccurrencesData({
       parentSession: parentResult.data,
@@ -1800,6 +1802,7 @@ const [viewOccurrencesData, setViewOccurrencesData] = useState<{
   showOnlyFinished?: boolean;
   totalOccurrences?: number;
   finishedCount?: number;
+  upcomingCount?: number; // Add this line to fix the error
 } | null>(null);
 
 const OccurrencesDialog = () => {
@@ -1889,7 +1892,7 @@ const OccurrencesDialog = () => {
                         <Button 
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewDetails(occurrence.id, parentSession.id)}
+                          onClick={() => handleViewDetails(occurrence.id)}
                         >
                           View Details
                         </Button>
@@ -2002,10 +2005,20 @@ const getAvailableCoaches = async () => {
       return [];
     }
 
+    interface Coach {
+      id?: string;
+      _id?: string;
+      email: string;
+      name?: string;
+      username?: string;
+      role: string;
+      status: string;
+    }
+
     // Filter active coaches and map to required format
     const availableCoaches = result.data
-      .filter(coach => coach.status === 'active')
-      .map(coach => ({
+      .filter((coach: Coach) => coach.status === 'active')
+      .map((coach: { id?: string; _id?: string; email: string; name?: string; username?: string; role: string }) => ({
         id: coach.id || coach._id,
         email: coach.email,
         displayName: coach.name || coach.username,
@@ -2185,7 +2198,7 @@ const handleConfirmExport = async () => {
 
     // Update local state
     setSessions([]);
-    setUnsavedSessions([]);
+    // setUnsavedSessions is not defined in this scope; remove or define it if needed.
     setHasUnsavedChanges(false);
 
     toast({
@@ -2438,7 +2451,7 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
     }, [selectedPlayerForMetrics, sessions, mongoPlayers]);
   
     const handleMetricChange = (key: string, value: number) => {
-      setLocalMetrics(prev => ({
+      setLocalMetrics((prev: Record<string, string>) => ({
         ...prev,
         [key]: value.toString()
       }));
@@ -2502,12 +2515,17 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
           </DialogDescription>
           <DialogFooter className="mt-4">
             <Button onClick={() => {
-              handleSaveMetrics(
-                selectedPlayerForMetrics?.sessionId,
-                selectedPlayerForMetrics?.id,
-                localMetrics
-              );
-              setSelectedPlayerForMetrics(null);
+              if (
+                selectedPlayerForMetrics &&
+                typeof selectedPlayerForMetrics.sessionId === "number"
+              ) {
+                handleSaveMetrics(
+                  selectedPlayerForMetrics.sessionId,
+                  selectedPlayerForMetrics.id,
+                  localMetrics
+                );
+                setSelectedPlayerForMetrics(null);
+              }
             }}>
               Save Metrics
             </Button>
@@ -2584,7 +2602,7 @@ const handleViewUpcomingOccurrences = async (parentId: number) => {
     // Calculate status for each occurrence based on date and time
     const now = new Date();
     const upcomingOccurrences = allOccurrences
-      .map(occurrence => {
+      .map((occurrence: Session) => {
         const occurrenceDate = new Date(occurrence.date);
         const [startHour, startMinute] = occurrence.startTime.split(':').map(Number);
         const sessionStart = new Date(occurrenceDate);
@@ -2600,12 +2618,11 @@ const handleViewUpcomingOccurrences = async (parentId: number) => {
         return null;
       })
       .filter(Boolean) // Remove null values
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Sort by date ascending
+      .sort((a: Session, b: Session) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Sort by date ascending
 
     setViewOccurrencesData({
       parentSession: parentResult.data,
       occurrences: upcomingOccurrences,
-      showOnlyUpcoming: true,
       totalOccurrences: allOccurrences.length,
       upcomingCount: upcomingOccurrences.length
     });
@@ -2633,6 +2650,28 @@ const renderSessionDetails = (session: Session | undefined) => {
   if (!session) return null;
 
   console.log('Rendering session details:', session);
+
+  // Helper function to calculate session status
+  const calculateSessionStatus = (session: Session) => {
+    const now = new Date();
+    const sessionDate = new Date(session.date);
+    const [startHour, startMinute] = session.startTime.split(':').map(Number);
+    const [endHour, endMinute] = session.endTime.split(':').map(Number);
+
+    const sessionStart = new Date(sessionDate);
+    sessionStart.setHours(startHour, startMinute, 0);
+
+    const sessionEnd = new Date(sessionDate);
+    sessionEnd.setHours(endHour, endMinute, 0);
+
+    if (now < sessionStart) {
+      return "Upcoming" as const;
+    } else if (now >= sessionStart && now <= sessionEnd) {
+      return "On-going" as const;
+    } else {
+      return "Finished" as const;
+    }
+  };
 
   const currentStatus = calculateSessionStatus(session);
   const filteredPlayers = (session.assignedPlayersData || []).filter(player => 
@@ -2771,11 +2810,14 @@ const renderSessionDetails = (session: Session | undefined) => {
     }
   
     // Store previous state for rollback
-    const previousSessions = [...sessions];
+    // Make sure 'sessions' is available in this scope. If this code is inside a React component, use the state variable.
+    // For example, if you have 'const [sessions, setSessions] = useState<Session[]>([])' at the top of your component, this line is correct.
+    // If not, pass 'sessions' as an argument to this function or import/use it from the correct context.
+    // Example fix (if inside a React component with sessions state):
+    const previousSessions = [...(typeof sessions !== "undefined" ? sessions : [])];
   
     // Find session in local state
     const session = sessions.find(s => 
-      s._id?.toString() === sessionId.toString() || 
       s.id.toString() === sessionId.toString()
     );
   
@@ -2796,18 +2838,42 @@ const renderSessionDetails = (session: Session | undefined) => {
   
     // Optimistic update
     setSessions(prev => prev.map(s => {
-      if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
-        return { ...s, attendance: updatedAttendance, isUpdating: true };
+      if (s.id.toString() === sessionId.toString()) {
+        return {
+          ...s,
+          attendance: {
+            ...s.attendance,
+            ...Object.fromEntries(
+              Object.entries(updatedAttendance).map(([playerId, data]) => [
+                playerId,
+                {
+                  status: data.status as "Present" | "Absent",
+                  markedAt: data.markedAt,
+                  markedBy: data.markedBy
+                }
+              ])
+            )
+          },
+          isUpdating: true
+        } as Session;
       }
       return s;
     }));
   
     // Update view details if open
-    if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-        viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
+    if (viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
       setViewDetailsSessionData(prev => prev ? {
         ...prev,
-        attendance: updatedAttendance
+        attendance: Object.fromEntries(
+          Object.entries(updatedAttendance).map(([id, data]) => [
+            id,
+            {
+              status: data.status === "Present" ? "Present" as const : "Absent" as const,
+              markedAt: data.markedAt,
+              markedBy: data.markedBy
+            }
+          ])
+        )
       } : prev);
     }
   
@@ -2827,7 +2893,7 @@ const renderSessionDetails = (session: Session | undefined) => {
         lastUpdated: new Date().toISOString()
       };
   
-      const apiId = session._id || session.id;
+      const apiId = session.id;
       const response = await fetch(`/api/db/ams-sessions/${apiId}`, {
         method: 'PATCH',
         headers: {
@@ -2881,8 +2947,7 @@ const renderSessionDetails = (session: Session | undefined) => {
       setSessions(previousSessions);
   
       // Update view details if open
-      if (viewDetailsSessionData?._id?.toString() === sessionId.toString() ||
-          viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
+      if (viewDetailsSessionData?.id?.toString() === sessionId.toString()) {
         setViewDetailsSessionData(prev => prev ? {
           ...prev,
           attendance: session.attendance
@@ -3039,7 +3104,7 @@ const renderSessionDetails = (session: Session | undefined) => {
             </div>
           </div>
           {filteredPlayers.length > 0 ? (
-            filteredPlayers.map((player) => (
+            filteredPlayers.map((player: { id: string; name: string; position?: string; photoUrl?: string }) => (
               <div key={player.id} className="flex items-center space-x-2 py-1">
                 <input
                   type="checkbox"
@@ -3127,7 +3192,7 @@ const handleSaveChanges = async () => {
     }
 
     // Filter the players based on the search query
-    const filteredPlayers = newSession.assignedPlayersData.filter(player =>
+    const filteredPlayers = newSession.assignedPlayersData.filter((player: { name: string }) =>
       player.name.toLowerCase().includes(playerSearchQuery.toLowerCase())
     );
 
@@ -3136,12 +3201,12 @@ const handleSaveChanges = async () => {
         <div className="text-sm text-gray-500">Players in batch:</div>
         <div className="h-[200px] overflow-y-auto border rounded-md p-2">
           {filteredPlayers.length > 0 ? (
-            filteredPlayers.map((player) => (
+            filteredPlayers.map((player: { id: string; name: string; position?: string; photoUrl?: string }) => (
               <div key={player.id} className="flex items-center space-x-2 py-1">
                 <input
                   type="checkbox"
-                  checked={newSession.assignedPlayers.includes(player._id.toString())}
-                  onChange={(e) => handlePlayerSelect(player._id.toString(), e.target.checked)}
+                  checked={newSession.assignedPlayers.includes(player.id.toString())}
+                  onChange={(e) => handlePlayerSelect(player.id.toString(), e.target.checked)}
                   className="w-4 h-4"
                 />
                 <span className="flex flex-col">
@@ -3253,7 +3318,7 @@ const handleSaveChanges = async () => {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              {renderSessionDetails(viewDetailsSessionData)}
+              {renderSessionDetails(viewDetailsSessionData ?? undefined)}
             </div>
             <DialogFooter>
               <Button variant="default" onClick={() => setViewDetailsSessionId(null)}>
@@ -3319,38 +3384,12 @@ const handleExportSessions = async (academyId: string | undefined) => {
   }
 };
 
-const handleClearSessions = async (academyId: string | undefined) => {
-  try {
-    if (!window.confirm('Are you sure you want to clear all sessions? This action cannot be undone.')) {
-      return;
-    }
-    const response = await fetch('/api/db/ams-sessions/actions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'clear',
-        academyId
-      }),
-    });
-    if (!response.ok) throw new Error('Failed to clear sessions');
-    setSessions([]);
-    setSelectedSessions([]);
-    toast({
-      title: "Success",
-      description: "All sessions cleared successfully",
-    });
-  } catch (error) {
-    console.error('Error clearing sessions:', error);
-    toast({
-      title: "Error",
-      description: "Failed to clear sessions",
-      variant: "destructive",
-    });
-  }
-};
+// Remove this top-level definition. Instead, define handleDeleteSelected inside SessionsContent
+// where selectedSessions, setSessions, and setSelectedSessions are available from useState.
 
+// Example (add this inside SessionsContent if you need this function):
+
+/*
 const handleDeleteSelected = async (academyId: string | undefined) => {
   try {
     if (!window.confirm(`Are you sure you want to delete ${selectedSessions.length} session(s)?`)) {
@@ -3383,6 +3422,7 @@ const handleDeleteSelected = async (academyId: string | undefined) => {
     });
   }
 };
+*/
 
 const convertToCSV = (data: any[]) => {
   if (!data.length) return '';
@@ -3398,7 +3438,35 @@ const convertToCSV = (data: any[]) => {
 // ...rest of existing code remains unchanged...
 
 // Update DialogContent component to fix hydration error
-const renderSessionDetails = (session: Session | undefined) => {
+// Helper function to calculate session status
+const calculateSessionStatus = (session: Session) => {
+  const now = new Date();
+  const sessionDate = new Date(session.date);
+  const [startHour, startMinute] = session.startTime.split(':').map(Number);
+  const [endHour, endMinute] = session.endTime.split(':').map(Number);
+
+  const sessionStart = new Date(sessionDate);
+  sessionStart.setHours(startHour, startMinute, 0);
+
+  const sessionEnd = new Date(sessionDate);
+  sessionEnd.setHours(endHour, endMinute, 0);
+
+  if (now < sessionStart) {
+    return "Upcoming" as const;
+  } else if (now >= sessionStart && now <= sessionEnd) {
+    return "On-going" as const;
+  } else {
+    return "Finished" as const;
+  }
+};
+
+const renderSessionDetails = (
+  session: Session | undefined, 
+  detailsPlayerSearchQuery: string = "",
+  handleMetricsClick: (playerId: string, playerName: string, sessionId: number) => void,
+  setSessions: (sessions: Session[] | ((prev: Session[]) => Session[])) => void,
+  user: { id: string; academyId: string } | null
+) => {
   if (!session) return null;
 
   console.log('Rendering session details:', session);
@@ -3436,8 +3504,7 @@ const renderSessionDetails = (session: Session | undefined) => {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <Switch
-                    checked={isPresent}
-                    onCheckedChange={(checked) => handleAttendanceChange(session.id, player.id, checked)}
+                    onCheckedChange={(checked) => handleAttendanceChange(session.id, player.id, checked, [session], setSessions, user)}
                     disabled={currentStatus === "Upcoming"}
                   />
                   <span className="text-sm">
@@ -3463,19 +3530,29 @@ const renderSessionDetails = (session: Session | undefined) => {
 };
 
 // Update handleAttendanceChange to handle occurrence sessions correctly
-const handleAttendanceChange = async (sessionId: number | string, playerId: string, isPresent: boolean) => {
+const handleAttendanceChange = async (
+  sessionId: number | string, 
+  playerId: string, 
+  isPresent: boolean,
+  currentSessions: Session[],
+  setSessions: (sessions: Session[] | ((prev: Session[]) => Session[])) => void,
+  user: { id: string; academyId: string } | null
+) => {
   if (!user?.academyId) {
     console.error('[ATTENDANCE] No academyId available');
     return;
   }
 
   // Store previous state for rollback
-  const previousSessions = [...sessions];
+  const previousSessions = [...currentSessions];
 
   try {
     // Optimistic update
-    setSessions(prev => prev.map(s => {
-      if (s._id?.toString() === sessionId.toString() || s.id.toString() === sessionId.toString()) {
+    // Make sure setSessions is available in this scope.
+    // If this code is outside SessionsContent, pass setSessions as an argument or prop.
+    // Example usage inside SessionsContent (where setSessions is defined):
+    setSessions((prev: Session[]) => prev.map(s => {
+      if (s.id.toString() === sessionId.toString()) {
         return {
           ...s,
           attendance: {
@@ -3505,8 +3582,16 @@ const handleAttendanceChange = async (sessionId: number | string, playerId: stri
 };
 
 // Add this new function to render match details
-const renderMatchDetails = () => {
-  const parentSession = sessions.find(s => s.id === viewDetailsSessionId);
+const renderMatchDetails = (
+  detailsPlayerSearchQuery: string,
+  handleMetricsClick: (playerId: string, playerName: string, sessionId: number) => void,
+  handleViewDetails: (sessionId: number) => void,
+  viewDetailsSessionId: number | null,
+  sessions: Session[],
+  setSessions: (sessions: Session[] | ((prev: Session[]) => Session[])) => void,
+  user: { id: string; academyId: string } | null
+) => {
+  const parentSession = sessions.find((s: Session) => s.id === viewDetailsSessionId);
   if (!parentSession) return null;
 
   // Find all occurrences for this session
@@ -3528,7 +3613,7 @@ const renderMatchDetails = () => {
           </div>
           <div>
             <p><strong>Total Occurrences:</strong> {parentSession.totalOccurrences}</p>
-            <p><strong>Recurring Until:</strong> {format(new Date(parentSession.recurringEndDate), "PP")}</p>
+            <p><strong>Recurring Until:</strong> {parentSession.recurringEndDate ? format(new Date(parentSession.recurringEndDate), "PP") : "Not set"}</p>
             <p><strong>Repeat on:</strong> {parentSession.selectedDays?.join(", ")}</p>
           </div>
         </div>
@@ -3570,7 +3655,13 @@ const renderMatchDetails = () => {
       </div>
 
       {/* Rest of existing session details */}
-      {renderSessionDetails(parentSession)}
+      {renderSessionDetails(
+        parentSession,
+        detailsPlayerSearchQuery,
+        handleMetricsClick,
+        setSessions,
+        user
+      )}
     </div>
   );
 };

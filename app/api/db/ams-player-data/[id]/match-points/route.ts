@@ -19,15 +19,18 @@ export async function PATCH(
         $set: {
           'attributes.matchPoints': points
         },
+        // Cast $push as any to avoid TypeScript type error with MongoDB driver
         $push: {
           performanceHistory: {
             date: new Date().toISOString(),
             type: 'match',
             matchId,
-            matchPoints: points,
-            previousPoints,
+            stats: {
+              matchPoints: { current: points },
+              previousPoints
+            }
           }
-        }
+        } as any
       }
     );
 

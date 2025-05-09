@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar';
 
 interface Session {
     _id: string;
+    id: string; // Added to match usage in code
     name: string;
     date: string;
     startTime: string;
@@ -29,7 +30,7 @@ export default function OwnerSessionsPage() {
     const router = useRouter();
 
     useEffect(() => {
-        if (!user || user.role !== 'owner') {
+        if (!user || String(user.role) !== 'owner') {
             router.push('/auth');
             return;
         }

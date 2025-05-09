@@ -1,9 +1,30 @@
 "use client"
 
+import { toast } from "@/components/ui/use-toast";
+
 // ...existing imports...
+
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+
+import { useState } from "react";
 
 export default function Achievement() {
   // ...existing state declarations...
+  const [achievements, setAchievements] = useState<any[]>([]);
+
+  // Add state for new achievement form data
+  const defaultAchievementData = {
+    title: "",
+    description: "",
+    // add other fields as needed
+  };
+  const [newAchievementData, setNewAchievementData] = useState(defaultAchievementData);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Get user from session
+  const { data: session } = useSession();
+  const user = session?.user;
 
   // Replace localStorage fetch with MongoDB fetch
   useEffect(() => {
@@ -101,6 +122,15 @@ export default function Achievement() {
   // ...rest of existing code...
 
   return (
-    // ...existing JSX...
+    <div>
+      {/* Replace this with your actual JSX for the Achievement page */}
+      <h1>Achievements</h1>
+      {/* Example: List achievements */}
+      <ul>
+        {achievements?.map((achievement: any) => (
+          <li key={achievement._id}>{achievement.title}</li>
+        ))}
+      </ul>
+    </div>
   );
 }

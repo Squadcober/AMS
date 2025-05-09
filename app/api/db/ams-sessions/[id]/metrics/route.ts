@@ -35,7 +35,7 @@ export async function PATCH(
             sessionRating: metrics.sessionRating,
             type: 'training'
           }
-        }
+        }as any
       }
     );
 

@@ -1,79 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+
+// Error handling utility
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
+    const id = params.id;
+    const db = await getDatabase();
 
-    console.log('Fetching batch with ID:', params.id);
+    // Build query based on ID type
+    const query = ObjectId.isValid(id) 
+      ? { _id: new ObjectId(id) }
+      : { id: id };
 
-    // First get the batch
-    const batch = await db.collection('ams-batches').findOne({
-      _id: new ObjectId(params.id)
-    });
+    const batch = await db.collection('ams-batches').findOne(query);
 
     if (!batch) {
-      console.log('Batch not found');
-      return NextResponse.json({ error: 'Batch not found' }, { status: 404 });
+      return NextResponse.json({
+        success: false,
+        error: 'Batch not found'
+      }, { status: 404 });
     }
 
-    console.log('Found batch with players:', batch.players);
+    if (!batch.players || !Array.isArray(batch.players)) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
 
-    // Get the players from ams-player-data collection using string IDs
+    // Convert string IDs to ObjectIds where possible
+    const playerObjectIds = batch.players
+      .map((id: string) => {
+        try {
+          return new ObjectId(id);
+        } catch {
+          return id; // Keep original if not valid ObjectId
+        }
+      });
+
+    // Find all players in batch
     const players = await db.collection('ams-player-data')
       .find({
-        id: { $in: batch.players }
+        $or: [
+          { _id: { $in: playerObjectIds.filter((id: string | ObjectId) => id instanceof ObjectId) } },
+          { id: { $in: playerObjectIds.filter((id: string | ObjectId) => typeof id === 'string') } }
+        ]
       })
       .toArray();
 
-    console.log(`Found ${players.length} players using string IDs`);
-
-    // If no players found with string IDs, try ObjectIds as fallback
-    if (players.length === 0) {
-      try {
-        const playerObjectIds = batch.players
-          .map(id => {
-            try {
-              return new ObjectId(id);
-            } catch {
-              return null;
-            }
-          })
-          .filter(Boolean);
-
-        if (playerObjectIds.length > 0) {
-          const playersById = await db.collection('ams-player-data')
-            .find({
-              _id: { $in: playerObjectIds }
-            })
-            .toArray();
-          console.log(`Found ${playersById.length} players using ObjectIds`);
-          
-          if (playersById.length > 0) {
-            return NextResponse.json({
-              success: true,
-              data: playersById.map(player => ({
-                ...player,
-                id: player._id.toString()
-              }))
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error trying ObjectId lookup:', error);
-      }
-    }
-
-    // Format and return whatever players we found
+    // Format response data
     const formattedPlayers = players.map(player => ({
       ...player,
-      id: player._id?.toString() || player.id,
-      _id: player._id?.toString() || player.id
+      _id: player._id.toString(),
+      id: player.id || player._id.toString(),
+      name: player.name || player.username || 'Unknown Player'
     }));
 
     return NextResponse.json({
@@ -83,9 +72,10 @@ export async function GET(
 
   } catch (error) {
     console.error('Error fetching batch players:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch batch players' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch batch players',
+      details: getErrorMessage(error)
+    }, { status: 500 });
   }
 }

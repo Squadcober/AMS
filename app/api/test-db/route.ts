@@ -34,7 +34,7 @@ export async function GET() {
     const collections = await db.listCollections().toArray();
     console.log('Found collections:', collections.map(c => c.name));
     
-    const stats = {};
+    const stats: { [key: string]: number } = {};
     for (const collection of collections) {
       const count = await db.collection(collection.name).countDocuments();
       stats[collection.name] = count;
@@ -52,8 +52,8 @@ export async function GET() {
     return NextResponse.json(
       { 
         error: 'Database connection failed', 
-        details: error.message,
-        stack: error.stack 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

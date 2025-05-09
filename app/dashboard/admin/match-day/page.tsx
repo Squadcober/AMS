@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext"
 
 interface Match {
   id: string
+  _id: string
   date: Date
   opponent: string
   venue: string
@@ -159,11 +160,26 @@ const dialogStyles = {
 };
 
 export default function MatchDay() {
+  interface Player {
+    id: string;
+    name: string;
+    academyId: string;
+    position: string;
+    attributes: {
+      matchPoints?: number;
+      goals?: number;
+      assists?: number;
+      cleanSheets?: number;
+      [key: string]: any;
+    };
+  }
+
   const { players, updatePlayerAttributes, setPlayers } = usePlayers()
   const { user } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [gamePlans, setGamePlans] = useState<string[]>([])
   const [newMatch, setNewMatch] = useState<Omit<Match, "id" | "playerRatings">>({
+    _id: "",
     date: new Date(),
     opponent: "",
     venue: "",
@@ -234,7 +250,7 @@ export default function MatchDay() {
         }
 
         if (playersData.success && Array.isArray(playersData.data)) {
-          const formattedPlayers = playersData.data.map(player => ({
+          const formattedPlayers = playersData.data.map((player: any) => ({
             ...player,
             id: player._id || player.id,
             name: player.name || player.username || 'Unknown Player',
@@ -386,6 +402,7 @@ export default function MatchDay() {
       if (result.success) {
         setMatches(prev => [...prev, result.data]);
         setNewMatch({
+          _id: "",
           date: new Date(),
           opponent: "",
           venue: "",
@@ -904,7 +921,7 @@ export default function MatchDay() {
                 </TableCell>
                 <TableCell>{match.team2 || match.opponent}</TableCell>
                 <TableCell>
-                  {match.status === 'Finished' ? (
+                  {match.status === 'Completed' ? (
                     match.team1Score === match.team2Score ? (
                       <Badge variant="secondary" className="bg-gray-500 text-white">
                         Match Tied
@@ -1055,7 +1072,7 @@ export default function MatchDay() {
                   return (
                     <TableRow key={player.id}>
                       <TableCell className="font-medium">{player.name}</TableCell>
-                      <TableCell>{player.position || 'N/A'}</TableCell>
+                      <TableCell>{player.attributes?.position ?? 'N/A'}</TableCell>
                       <TableCell>{getFormattedValue(currentPoints)}</TableCell>
                       <TableCell>
                         <div className="space-y-2">
@@ -1368,7 +1385,7 @@ export default function MatchDay() {
         {activeLog === "Upcoming" && renderMatchTable("Upcoming")}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent style={dialogStyles} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
+          <DialogContent style={{ maxWidth: '99vw', width: '2200px' }} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Match Details</DialogTitle>
             </DialogHeader>

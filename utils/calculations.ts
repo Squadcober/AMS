@@ -8,8 +8,9 @@ export function calculateOverall(attributes: Partial<PlayerAttributes>, performa
   if (performanceHistory?.length > 0) {
     const latestPerformance = performanceHistory[performanceHistory.length - 1]?.attributes || {};
     Object.keys(latestAttributes).forEach(key => {
-      if (latestPerformance[key]) {
-        latestAttributes[key] = (latestAttributes[key] + latestPerformance[key]) / 2;
+      const typedKey = key as keyof PlayerAttributes;
+      if (latestPerformance[typedKey]) {
+        latestAttributes[typedKey] = (latestAttributes[typedKey] + latestPerformance[typedKey]) / 2;
       }
     });
   }

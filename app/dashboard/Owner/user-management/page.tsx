@@ -177,7 +177,7 @@ export default function UserManagement() {
   }
 
   const handleStatusToggle = async (userId: string) => {
-    const userToUpdate = users.find(u => u.id === userId || u._id === userId)
+    const userToUpdate = users.find(u => u.id === userId)
     if (!userToUpdate) return
     const newStatus = userToUpdate.status === "active" ? "inactive" : "active"
     try {
@@ -191,7 +191,7 @@ export default function UserManagement() {
       if (data.success) {
         setUsers(prev =>
           prev.map(u =>
-            (u.id === userId || u._id === userId)
+            (u.id === userId)
               ? { ...u, status: newStatus }
               : u
           )

@@ -27,16 +27,21 @@ export async function GET(
       }, { status: 404 });
     }
 
+    interface Rating {
+      studentId: string;
+      [key: string]: any;
+    }
+
     // If there are ratings, fetch student names
-    let ratings = coachInfo?.ratings || [];
+    let ratings = coachInfo?.ratings || [] as Rating[];
     if (ratings.length > 0) {
-      const studentIds = ratings.map(r => r.studentId);
+      const studentIds = ratings.map((r: Rating) => r.studentId);
       const students = await db.collection('ams-users')
         .find({ id: { $in: studentIds } })
         .toArray();
 
       // Map student names to ratings
-      ratings = ratings.map(rating => {
+      ratings = ratings.map((rating: Rating) => {
         const student = students.find(s => s.id === rating.studentId);
         return {
           ...rating,

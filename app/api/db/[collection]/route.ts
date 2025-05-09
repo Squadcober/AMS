@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 
+// Add error handling utility
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { collection: string } }
@@ -23,7 +29,7 @@ export async function GET(
   } catch (error) {
     console.error('Database operation failed:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch data', details: error.message },
+      { error: 'Failed to fetch data', details: getErrorMessage(error) },
       { status: 500 }
     );
   }
@@ -71,7 +77,7 @@ export async function POST(
   } catch (error) {
     console.error('Failed to create document:', error);
     return NextResponse.json(
-      { error: 'Failed to create data', details: error.message },
+      { error: 'Failed to create document', details: getErrorMessage(error) },
       { status: 500 }
     );
   }

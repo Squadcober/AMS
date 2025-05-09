@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext"
 
 interface Match {
   id: string
+  _id: string
   date: Date
   opponent: string
   venue: string
@@ -153,17 +154,32 @@ const debugPlayerData = (players: any[]) => {
 
 const dialogStyles = {
   content: {
-    maxWidth: '95vw',
-    width: '1600px',
+    maxWidth: '99vw',
+    width: '2200px', // Increased width for match detail dialog
   }
 };
 
 export default function MatchDay() {
+  interface Player {
+    id: string;
+    name: string;
+    academyId: string;
+    position: string;
+    attributes: {
+      matchPoints?: number;
+      goals?: number;
+      assists?: number;
+      cleanSheets?: number;
+      [key: string]: any;
+    };
+  }
+
   const { players, updatePlayerAttributes, setPlayers } = usePlayers()
   const { user } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [gamePlans, setGamePlans] = useState<string[]>([])
   const [newMatch, setNewMatch] = useState<Omit<Match, "id" | "playerRatings">>({
+    _id: "",
     date: new Date(),
     opponent: "",
     venue: "",
@@ -234,7 +250,7 @@ export default function MatchDay() {
         }
 
         if (playersData.success && Array.isArray(playersData.data)) {
-          const formattedPlayers = playersData.data.map(player => ({
+          const formattedPlayers = playersData.data.map((player: any) => ({
             ...player,
             id: player._id || player.id,
             name: player.name || player.username || 'Unknown Player',
@@ -386,6 +402,7 @@ export default function MatchDay() {
       if (result.success) {
         setMatches(prev => [...prev, result.data]);
         setNewMatch({
+          _id: "",
           date: new Date(),
           opponent: "",
           venue: "",
@@ -486,7 +503,26 @@ export default function MatchDay() {
     try {
       console.log('Updating match:', matchId, 'with updates:', updates);
       
-      // Changed from ${matchId} to ?matchId=${matchId} to match the API route structure
+      // Determine winner and loser if both scores are present
+      const match = matches.find(m => m._id === matchId);
+      if (match) {
+        const team1Score = updates.team1Score ?? match.team1Score;
+        const team2Score = updates.team2Score ?? match.team2Score;
+        
+        if (team1Score !== undefined && team2Score !== undefined) {
+          if (team1Score > team2Score) {
+            updates.winner = match.team1 || 'Our Team';
+            updates.loser = match.team2 || match.opponent;
+          } else if (team2Score > team1Score) {
+            updates.winner = match.team2 || match.opponent;
+            updates.loser = match.team1 || 'Our Team';
+          } else {
+            updates.winner = null;
+            updates.loser = null;
+          }
+        }
+      }
+
       const response = await fetch(`/api/db/ams-match-day?matchId=${matchId}`, {
         method: 'PATCH',
         headers: {
@@ -675,9 +711,13 @@ export default function MatchDay() {
   
       console.log('Saving stats for match:', matchId);
   
+      // Ensure current is set to edited if edited exists
       const updatedStats = Object.entries(playerStats).reduce((acc, [playerId, stats]) => {
         acc[playerId] = {
-          matchPoints: stats.matchPoints,
+          ...stats,
+          matchPoints: {
+            current: stats.matchPoints.edited !== undefined ? stats.matchPoints.edited : stats.matchPoints.current
+          },
           goals: stats.goals || 0,
           assists: stats.assists || 0,
           cleanSheets: stats.cleanSheets || 0
@@ -685,7 +725,6 @@ export default function MatchDay() {
         return acc;
       }, {} as any);
   
-      // First update the match stats
       const response = await fetch(`/api/db/ams-match-day?matchId=${matchId}`, {
         method: 'PATCH',
         headers: {
@@ -693,7 +732,7 @@ export default function MatchDay() {
         },
         body: JSON.stringify({ 
           playerStats: updatedStats,
-          type: 'stats-update'  // Add a type to differentiate this update
+          type: 'stats-update'
         })
       });
   
@@ -703,14 +742,31 @@ export default function MatchDay() {
       }
   
       const result = await response.json();
-      
+  
       if (result.success) {
-        // Update local state with new stats
+        // Update local state: clear edited and set current to the new value
+        setPlayerStats(prev =>
+          Object.fromEntries(
+            Object.entries(prev).map(([playerId, stats]) => [
+              playerId,
+              {
+                ...stats,
+                matchPoints: {
+                  current: stats.matchPoints.edited !== undefined ? stats.matchPoints.edited : stats.matchPoints.current
+                },
+                goals: stats.goals || 0,
+                assists: stats.assists || 0,
+                cleanSheets: stats.cleanSheets || 0
+              }
+            ])
+          )
+        );
+  
         setMatches(prev => prev.map(match => 
           match._id === matchId ? { ...match, playerStats: updatedStats } : match
         ));
   
-        // Update individual player stats
+        // ...existing code for updating player stats and refreshing matches...
         await Promise.all(
           Object.entries(playerStats).map(async ([playerId, stats]) => {
             const playerResponse = await fetch(`/api/db/ams-player-data/${playerId}/stats`, {
@@ -720,7 +776,12 @@ export default function MatchDay() {
               },
               body: JSON.stringify({
                 matchId,
-                stats
+                stats: {
+                  ...stats,
+                  matchPoints: {
+                    current: stats.matchPoints.edited !== undefined ? stats.matchPoints.edited : stats.matchPoints.current
+                  }
+                }
               })
             });
   
@@ -735,7 +796,6 @@ export default function MatchDay() {
           description: "Stats saved successfully",
         });
   
-        // Refresh match data
         if (user?.academyId) {
           const matchResponse = await fetch(`/api/db/ams-match-day?academyId=${user.academyId}`);
           const matchData = await matchResponse.json();
@@ -861,21 +921,29 @@ export default function MatchDay() {
                 </TableCell>
                 <TableCell>{match.team2 || match.opponent}</TableCell>
                 <TableCell>
-                  {match.status === 'Finished' ? (
+                  {match.status === 'Completed' ? (
                     match.team1Score === match.team2Score ? (
-                      <Badge variant="secondary">Match Tied</Badge>
+                      <Badge variant="secondary" className="bg-gray-500 text-white">
+                        Match Tied
+                      </Badge>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="flex flex-col gap-2">
                         {match.winner && (
-                          <Badge variant="success">Winner: {match.winner}</Badge>
+                          <Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">
+                            Winner: {match.winner}
+                          </Badge>
                         )}
                         {match.loser && (
-                          <Badge variant="destructive">Loser: {match.loser}</Badge>
+                          <Badge variant="default" className="bg-red-600 text-white hover:bg-red-700">
+                            Loser: {match.loser}
+                          </Badge>
                         )}
                       </div>
                     )
                   ) : (
-                    <Badge variant="outline">{match.status || 'Upcoming'}</Badge>
+                    <Badge variant="outline" className="border-gray-400 text-gray-400">
+                      {match.status || 'Upcoming'}
+                    </Badge>
                   )}
                 </TableCell>
                 <TableCell>{match.startTime}</TableCell>
@@ -1004,7 +1072,7 @@ export default function MatchDay() {
                   return (
                     <TableRow key={player.id}>
                       <TableCell className="font-medium">{player.name}</TableCell>
-                      <TableCell>{player.position || 'N/A'}</TableCell>
+                      <TableCell>{player.attributes?.position ?? 'N/A'}</TableCell>
                       <TableCell>{getFormattedValue(currentPoints)}</TableCell>
                       <TableCell>
                         <div className="space-y-2">
@@ -1317,7 +1385,7 @@ export default function MatchDay() {
         {activeLog === "Upcoming" && renderMatchTable("Upcoming")}
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent style={dialogStyles} className="max-h-[85vh] overflow-y-auto">
+          <DialogContent style={{ maxWidth: '99vw', width: '2200px' }} className="max-w-[85vh] overflow-x-auto max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Match Details</DialogTitle>
             </DialogHeader>

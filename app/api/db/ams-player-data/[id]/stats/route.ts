@@ -43,7 +43,7 @@ export async function PATCH(
             stats,
             type: 'match'
           }
-        }
+        } as any
       }
     );
 

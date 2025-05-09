@@ -76,7 +76,7 @@ export default function BatchesPage() {
         } else {
           // Fetch all academies' batches and merge
           const batchResults = await Promise.all(
-            formattedAcademies.map(a =>
+            formattedAcademies.map((a: { id: string, name: string }) =>
               fetch(`/api/db/ams-batches?academyId=${a.id}`)
                 .then(res => res.ok ? res.json() : { success: false, data: [] })
                 .catch(() => ({ success: false, data: [] }))

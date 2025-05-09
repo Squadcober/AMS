@@ -18,7 +18,7 @@ export default function AcademyManagement() {
     const router = useRouter();
 
     useEffect(() => {
-        if (!user || user.role !== 'owner') {
+        if (!user || String(user.role) !== 'owner') {
             console.error('Unauthorized access. Redirecting...');
             router.push('/auth'); // Redirect if not an owner
         }
@@ -53,7 +53,16 @@ export default function AcademyManagement() {
     const handleAddAcademy = async (e: React.FormEvent) => {
         e.preventDefault();
         if (generatedId && newAcademyName) {
-            const newAcademy = { id: generatedId, name: newAcademyName };
+            const now = new Date();
+            const newAcademy = {
+                id: generatedId,
+                name: newAcademyName,
+                location: '',
+                contact: '',
+                email: '',
+                createdAt: now,
+                updatedAt: now
+            };
             try {
                 const createdAcademy = await createAcademy(newAcademy); // Save to MongoDB
                 if (createdAcademy) {

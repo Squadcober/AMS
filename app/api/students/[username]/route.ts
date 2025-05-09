@@ -59,7 +59,7 @@ export async function GET(
     );
     
     const overallRating = validAttributes.length > 0
-      ? validAttributes.reduce((acc: number, val: number) => acc + val, 0) / validAttributes.length
+      ? validAttributes.reduce((acc: number, val: unknown) => acc + (val as number), 0) / validAttributes.length
       : 0;
 
     return NextResponse.json({

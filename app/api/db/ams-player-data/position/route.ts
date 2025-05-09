@@ -15,7 +15,12 @@ export async function GET(request: Request) {
     }
 
     const db = await getDatabase();
-    const query = {
+    const query: { 
+      academyId: string; 
+      isActive: boolean; 
+      isDeleted: { $ne: boolean }; 
+      position?: string 
+    } = {
       academyId,
       isActive: true,
       isDeleted: { $ne: true }

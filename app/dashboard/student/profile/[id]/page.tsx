@@ -17,7 +17,7 @@ ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, 
 
 export default function StudentProfile() {
   const { id } = useParams()
-  const { players, getPlayerById } = usePlayers()
+  const { players } = usePlayers()
   const { user } = useAuth()
   const { batches } = useBatches()
   const [profileData, setProfileData] = useState<any>(null)
@@ -27,12 +27,12 @@ export default function StudentProfile() {
 
   useEffect(() => {
     if (id) {
-      const player = getPlayerById(Number(id))
+      const player = players.find((p: any) => String(p.id) === String(id))
       if (player) {
         setProfileData(player)
         setIsCoachProfile(false)
       } else {
-        const batch = batches.find((batch) => batch.coachId === id)
+        const batch = batches.find((batch) => String(batch.coachId) === String(id))
         if (batch) {
           setProfileData({ ...batch, name: batch.coachName })
           setIsCoachProfile(true)
@@ -41,7 +41,7 @@ export default function StudentProfile() {
         }
       }
     }
-  }, [id, getPlayerById, batches])
+  }, [id, batches])
 
   const handleRatingChange = (value: number) => {
     setRating(value)

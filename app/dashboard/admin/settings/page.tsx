@@ -250,7 +250,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Additional fields based on role */}
-              {user?.role === 'player' && (
+              {(user?.role as string) === 'player' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm">Position</label>

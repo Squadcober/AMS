@@ -41,7 +41,7 @@ const calculateOverallRating = (attributes: any) => {
   ];
   
   const sum = values.reduce((acc, val) => acc + val, 0);
-  return (sum / 6).toFixed(1); // Average of all attributes
+  return Number((sum / 6).toFixed(1)); // Average of all attributes
 };
 
 const calculateAveragePerformance = (player: any) => {

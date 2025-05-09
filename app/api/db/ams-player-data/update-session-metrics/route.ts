@@ -50,8 +50,8 @@ export async function PATCH(request: NextRequest) {
           lastUpdated: new Date()
         },
         $push: {
-          performanceHistory: performanceEntry
-        }
+          'performanceHistory': { $each: [performanceEntry] }
+        }as any,
       }
     );
 

@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext"
 
 interface Match {
   _id: string
+  id: string
   date: string
   opponent: string
   venue: string

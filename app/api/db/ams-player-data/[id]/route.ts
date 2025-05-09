@@ -81,12 +81,18 @@ export async function PATCH(
     
     const overallRating = (attributeValues.reduce((sum, val) => sum + val, 0) / 60) * 100;
 
+    interface Performance {
+      sessionRating?: number;
+      trainingPoints?: number;
+      matchPoints?: number;
+    }
+
     // Calculate average training performance (out of 10)
     const performanceHistory = currentPlayer.performanceHistory || [];
     const recentPerformances = performanceHistory.slice(-5); // Last 5 performances
     
     const averagePerformance = recentPerformances.length > 0 
-      ? (recentPerformances.reduce((sum, perf) => {
+      ? (recentPerformances.reduce((sum: number, perf: Performance) => {
           const sessionRating = perf.sessionRating || 0;
           const trainingPoints = perf.trainingPoints || 0;
           const matchPoints = perf.matchPoints || 0;
@@ -95,7 +101,7 @@ export async function PATCH(
       : 0;
 
     // Add calculations to the update operation
-    const updateOperation = {
+    const updateOperation: { $set: any; $push?: any } = {
       $set: {
         ...updates.$set,
         overallRating: Math.round(overallRating * 10) / 10, // Round to 1 decimal
@@ -185,7 +191,7 @@ export async function PUT(
       { returnDocument: 'after' }
     );
 
-    if (!result.value) {
+    if (!result?.value) {
       return NextResponse.json(
         { success: false, error: 'Failed to update player data' },
         { status: 500 }

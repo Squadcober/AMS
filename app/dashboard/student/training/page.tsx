@@ -78,9 +78,8 @@ export default function Training() {
 
     // Possible IDs to check in the attendance object
     const possibleIds = [
-      user._id, // MongoDB ID
       user.username, // Username
-      user.userId, // User ID
+      // user.userId, // User ID (removed because it does not exist)
       '67ee678c34baa740e23e21c4', // Player document ID
       'player_qa4d9vdz1_1743677324992' // Player ID
     ].filter(Boolean); // Remove any undefined values

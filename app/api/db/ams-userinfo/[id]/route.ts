@@ -18,7 +18,7 @@ export async function GET(
     // Get base user data
     const userData = await db.collection('ams-users').findOne({
       $or: [
-        { _id: params.id },
+        { _id: new ObjectId(params.id) },
         { id: params.id }
       ]
     });
@@ -93,7 +93,7 @@ export async function PATCH(
 
     // Update ams-users collection
     await db.collection('ams-users').updateOne(
-      { $or: [{ _id: params.id }, { id: params.id }] },
+      { $or: [{ _id: new ObjectId(params.id) }, { id: params.id }] },
       { $set: userUpdates }
     );
 

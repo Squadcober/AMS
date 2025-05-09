@@ -339,7 +339,7 @@ export default function BatchPerformancePage() {
           maxTicksLimit: 10, // Show max 10 date labels
           callback: function(value: any, index: number, values: any[]) {
             // Show date in MMM DD format
-            return this.getLabelForValue(value);
+            return value;
           }
         }
       },

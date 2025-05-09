@@ -66,11 +66,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser({
             id: 'owner-id',
             username: 'ownerams',
-            role: 'owner',
-            // Add other required User interface properties
+            role: UserRole.OWNER,
             displayName: 'Owner',
             password: 'pass5key',
             name: 'Owner',
+            academyId: '',
+            photoUrl: '',
+            about: '',
+            sessionsCount: 0,
+            email: '',
+            ratings: [],
+            license: '',
+            age: 0,
+            phoneNumber: '', // Add the missing phoneNumber field
+            address: '', // Add the required address field
+            education: ''
           });
           if (pathname === '/auth') {
             router.push('/dashboard/Owner/academy-management');
@@ -147,12 +157,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Check for owner credentials first
       if (username === 'ownerams' && password === 'pass5key') {
-        const ownerUser = {
+        const ownerUser: User = {
           id: 'owner-id',
           username: 'ownerams',
-          role: 'owner',
+          role: UserRole.OWNER,
           displayName: 'Owner',
           name: 'Owner',
+          academyId: '',
+          photoUrl: '',
+          about: '',
+          sessionsCount: 0,
+          password: 'pass5key',
+          phoneNumber: '',
+          email: '',
+          address: '',
+          education: '',
+          ratings: [],
+          license: '',
+          age: 0
         };
 
         setUser(ownerUser);

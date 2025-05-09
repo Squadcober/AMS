@@ -65,7 +65,7 @@ export default function StudentBatches() {
         setBatches(playerBatches);
 
         const coachIds = new Set<string>();
-        playerBatches.forEach(batch => {
+        playerBatches.forEach((batch: { coachId?: string; coachIds?: string[]; userId?: string }) => {
           if (batch.coachId) coachIds.add(batch.coachId);
           if (Array.isArray(batch.coachIds)) {
             batch.coachIds.forEach(id => coachIds.add(id.toString()));
@@ -306,7 +306,7 @@ export default function StudentBatches() {
         }));
 
         if (selectedCoach?.id === coachId) {
-          setSelectedCoach(prev => ({
+          setSelectedCoach((prev: typeof selectedCoach) => ({
             ...prev,
             ...data.data,
             ratings: data.data.ratings || []
@@ -606,7 +606,7 @@ export default function StudentBatches() {
                     </CardHeader>
                     <CardContent>
                       <ul className="list-disc pl-4 space-y-2">
-                        {selectedCoach.achievements.map((achievement, index) => (
+                        {selectedCoach.achievements.map((achievement: string, index: number) => (
                           <li key={index}>{achievement}</li>
                         ))}
                       </ul>

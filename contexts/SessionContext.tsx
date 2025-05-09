@@ -19,8 +19,11 @@ export interface Session {
   isRecurring?: boolean
   recurringEndDate?: string
   selectedDays?: string[]
-  // Remove parentSessionId and isOccurrence
+  parentSessionId?: number
   academyId: string
+  attendance: Record<string, any>
+  playerMetrics: Record<string, any>
+  playerRatings: Record<string, any>
 }
 
 interface SessionContextType {

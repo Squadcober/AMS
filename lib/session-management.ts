@@ -4,6 +4,16 @@ const LOCAL_STORAGE_KEY = "ams-sessions"
 const USER_CREATED_SESSIONS_KEY = "user-created-sessions"
 
 export class SessionManager {
+  private static cachedSessions: any[] | null = null;
+
+  static getCache() {
+    return this.cachedSessions;
+  }
+
+  static setCache(sessions: any[]) {
+    this.cachedSessions = sessions;
+  }
+  
   static async getSessions(academyId: string): Promise<Session[]> {
     try {
       const response = await fetch(

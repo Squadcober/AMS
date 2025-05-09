@@ -6,7 +6,7 @@ import { Plus, X, Save, Edit, Facebook, Instagram, Youtube, Twitter, Upload, Fil
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { CollateralModal } from "@/components/collateral-modal"
-import type { Collateral, CollateralFile } from "@/types/collateral"
+import type { Collateral as ImportedCollateral, CollateralFile as ImportedCollateralFile } from "@/types/collateral"
 import type React from "react"
 import { toast } from "@/components/ui/use-toast"
 import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
@@ -43,6 +43,7 @@ interface AboutData {
 }
 
 interface CollateralFile {
+  academyId: string;
   id: string;
   name: string;
   url: string;
@@ -54,6 +55,7 @@ interface Collateral {
   name: string;
   files: CollateralFile[];
   acceptedTypes: string;
+  checked?: boolean;
 }
 
 type SocialMedia = {
@@ -509,13 +511,14 @@ export default function AboutPage() {
                       )}
                       <input
                         type="file"
-                        ref={el => fileInputRefs.current[index] = el}
+                        ref={el => { fileInputRefs.current[index] = el }}
                         className="hidden"
                         accept={collateral.acceptedTypes}
                         multiple
                         onChange={(e) => {
                           if (e.target.files) {
                             const newFiles = Array.from(e.target.files).map(file => ({
+                              academyId: user?.academyId || '',
                               id: Math.random().toString(36).substr(2, 9),
                               name: file.name,
                               url: URL.createObjectURL(file),

@@ -32,15 +32,19 @@ export default function RootLayout({
         <link rel="icon" href="/logo.png" />
       </head>
       <body className="min-h-screen bg-background">
-        <ThemeProvider attribute="class" defaultTheme="dark">
-          <AuthProvider>
-            <PlayerProvider>
-              <BatchProvider>
-                {children}
-              </BatchProvider>
-            </PlayerProvider>
-          </AuthProvider>
-        </ThemeProvider>
+      <ThemeProvider attribute="class" defaultTheme="dark">
+        <AuthProvider>
+          <PlayerProvider>
+            <BatchProvider>
+              <CoachProvider>
+                <SessionProvider>
+                  {children}
+                </SessionProvider>
+              </CoachProvider>
+           </BatchProvider>
+          </PlayerProvider>
+        </AuthProvider>
+      </ThemeProvider>
       </body>
     </html>
   )

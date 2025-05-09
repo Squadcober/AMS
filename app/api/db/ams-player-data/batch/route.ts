@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       } catch {
         return null;
       }
-    }).filter(Boolean);
+    }).filter((id): id is ObjectId => id !== null);
 
     // Query using both string IDs and ObjectIds
     const players = await db.collection('ams-player-data')

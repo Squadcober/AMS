@@ -1,6 +1,6 @@
 let userConfig = undefined
 try {
-  userConfig = await import('./v0-user-next.config')
+  userConfig = await import('next.config')
 } catch (e) {
   // ignore error
 }
@@ -16,11 +16,58 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  output: 'standalone',
   experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
+    serverActions: true,
+    isrMemoryCacheSize: 0,
+    optimizeCss: false,
+    optimizePackageImports: false,
   },
+  // Force dynamic rendering for all pages
+  reactStrictMode: true,
+  staticPageGenerationTimeout: 0,
+  compiler: {
+    removeConsole: false,
+  },
+  // Add proper dynamic config
+  appDir: true,
+  // Force all pages to be dynamic by default
+  runtime: 'nodejs',
+  generateEtags: false,
+  // Prevent static optimization
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+        ],
+      },
+    ]
+  },
+  rewrites: async () => {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/api/:path*',
+      },
+    ]
+  },
+  // Force pages to be dynamic
+  pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
+  // Configure build options
+  webpack: (config, { dev, isServer }) => {
+    // Force all pages to be server-side rendered
+    if (!dev && !isServer) {
+      Object.assign(config.resolve.alias, {
+        'next/dynamic': 'next/dynamic',
+      });
+    }
+    return config;
+  }
 }
 
 mergeConfig(nextConfig, userConfig)

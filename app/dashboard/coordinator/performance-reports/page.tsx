@@ -36,8 +36,18 @@ interface Player {
   position: string;
   academyId: string;
   photoUrl?: string;
+  age?: number;
   attributes: PlayerAttributes;
   performanceHistory: PerformanceEntry[];
+  sessionsAttended?: Array<{
+    name: string;
+    date: string;
+    performance: string;
+  }>;
+  coachReviews?: Array<{
+    coachName: string;
+    comment: string;
+  }>;
 }
 
 interface PerformanceEntry {
@@ -123,7 +133,7 @@ export default function PerformanceReports() {
           throw new Error("Invalid data format received");
         }
 
-        const formattedPlayers = result.data.map(player => ({
+        const formattedPlayers = result.data.map((player: any) => ({
           id: player._id?.toString() || player.id,
           name: player.name || player.username || "Unknown Player",
           position: player.position || "Not specified",

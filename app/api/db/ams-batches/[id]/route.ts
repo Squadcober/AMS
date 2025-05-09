@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
+// Add type for query object
+type BatchQuery = {
+  _id?: ObjectId;
+  id?: string;
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -16,13 +22,13 @@ export async function GET(
 
     const db = await getDatabase();
     
-    // Try to get batch using ObjectId or string ID
-    const batch = await db.collection('ams-batches').findOne({
-      $or: [
-        { _id: ObjectId.isValid(params.id) ? new ObjectId(params.id) : null },
-        { id: params.id }
-      ]
-    });
+    // Build the query based on ID format with proper typing
+    let query: BatchQuery = { id: params.id }; // Default to string ID
+    if (ObjectId.isValid(params.id)) {
+      query = { _id: new ObjectId(params.id) };
+    }
+
+    const batch = await db.collection('ams-batches').findOne(query);
 
     if (!batch) {
       return NextResponse.json({
@@ -35,13 +41,22 @@ export async function GET(
     const coachIds = Array.isArray(batch.coachIds) ? batch.coachIds : 
                     batch.coachId ? [batch.coachId] : [];
 
+    // Convert valid string IDs to ObjectIds, filtering out invalid ones
+    const objectIds = coachIds
+      .map(id => {
+        try { 
+          return ObjectId.isValid(id) ? new ObjectId(id) : null;
+        } catch { 
+          return null; 
+        }
+      })
+      .filter((id): id is ObjectId => id !== null);
+
     const coaches = await db.collection('ams-users')
       .find({
         $or: [
           { id: { $in: coachIds } },
-          { _id: { $in: coachIds.map(id => {
-            try { return new ObjectId(id); } catch { return null; }
-          }).filter(Boolean) } }
+          { _id: { $in: objectIds } }
         ]
       })
       .toArray();

@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { ObjectId, Document, UpdateFilter } from 'mongodb';
+
+// Define rating interface
+interface Rating {
+  studentId: string;
+  rating: number;
+  date: string;
+}
+
+// Add type definitions for query conditions
+type QueryCondition = 
+  | { id: string; userId?: undefined; _id?: undefined }
+  | { userId: string; id?: undefined; _id?: undefined }
+  | { _id: ObjectId; id?: undefined; userId?: undefined };
+
+// Define coach document interface
+interface CoachDocument extends Document {
+  ratings: Rating[];
+  totalRatings: number;
+  ratingSum: number;
+  averageRating: number;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,24 +36,35 @@ export async function POST(request: NextRequest) {
 
     const db = await getDatabase();
 
+    // Build type-safe query conditions
+    const queryConditions: QueryCondition[] = [
+      { id: coachId },
+      { userId: coachId }
+    ];
+
+    // Only add ObjectId condition if valid
+    if (ObjectId.isValid(coachId)) {
+      queryConditions.push({ _id: new ObjectId(coachId) } as QueryCondition);
+    }
+
     // Add new rating and update average
-    const result = await db.collection('ams-coaches').updateOne(
-      { 
-        $or: [
-          { id: coachId },
-          { userId: coachId },
-          { _id: ObjectId.isValid(coachId) ? new ObjectId(coachId) : null }
-        ]
+    const updateDoc: UpdateFilter<CoachDocument> = {
+      $push: {
+        ratings: {
+          studentId,
+          rating,
+          date
+        } as any // Use 'any' to satisfy the MongoDB driver type
       },
-      {
-        $push: {
-          ratings: { studentId, rating, date }
-        },
-        $inc: { 
-          totalRatings: 1,
-          ratingSum: rating
-        }
+      $inc: {
+        totalRatings: 1,
+        ratingSum: rating
       }
+    };
+
+    const result = await db.collection<CoachDocument>('ams-coaches').updateOne(
+      { $or: queryConditions },
+      updateDoc
     );
 
     if (result.matchedCount === 0) {
@@ -42,15 +74,9 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // Update average rating
+    // Update average rating using same query
     await db.collection('ams-coaches').updateOne(
-      { 
-        $or: [
-          { id: coachId },
-          { userId: coachId },
-          { _id: ObjectId.isValid(coachId) ? new ObjectId(coachId) : null }
-        ]
-      },
+      { $or: queryConditions },
       [{
         $set: {
           averageRating: {

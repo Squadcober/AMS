@@ -79,11 +79,21 @@ export default function AttendancePage() {
     const presentDates = uniqueDates.filter(date =>
       userRecords.some(r => r.date === date && r.status === "present")
     )
+    // Count absent marks (one per date)
+    const absentDates = uniqueDates.filter(date =>
+      userRecords.some(r => r.date === date && r.status === "absent")
+    )
+    // Count late marks (one per date)
+    const lateDates = uniqueDates.filter(date =>
+      userRecords.some(r => r.date === date && r.status === "late")
+    )
     // Last 10 present dates (descending)
     const last10Present = presentDates.slice(0, 10)
     return {
       total: uniqueDates.length,
       present: presentDates.length,
+      absent: absentDates.length,
+      late: lateDates.length,
       last10Present
     }
   }

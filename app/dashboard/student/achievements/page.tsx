@@ -1,7 +1,11 @@
 "use client"
 
-import { useState, useEffect, ChangeEvent } from "react"
+import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { useState, useEffect, ChangeEvent } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/use-toast"
+import { FileInput } from "@/components/ui/custom-file-input"
 import { Badge } from "@/components/ui/badge"
 import { CustomTooltip } from "@/components/custom-tooltip"
 import { Button } from "@/components/ui/button"
@@ -11,7 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Sidebar } from "@/components/Sidebar"
-import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 
@@ -27,16 +30,6 @@ const formatDate = (dateString: string) => {
     return 'Invalid date';
   }
 };
-
-export function FileInput({ onChangeAction }: { onChangeAction: (e: ChangeEvent<HTMLInputElement>) => void }) {
-  return (
-    <input
-      type="file"
-      onChange={onChangeAction}
-      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-    />
-  )
-}
 
 interface Achievement {
   _id: string;
@@ -60,10 +53,17 @@ export default function Achievements() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAchievement, setNewAchievement] = useState({
+  const [newAchievement, setNewAchievement] = useState<{
+    title: string;
+    description: string;
+    type: 'Tournament' | 'Award' | 'Milestone' | 'Certification' | 'Other';
+    date: string;
+    location: string;
+    certificationUrl: string;
+  }>({
     title: '',
     description: '',
-    type: 'Tournament' as const,
+    type: 'Tournament',
     date: new Date().toISOString().split('T')[0],
     location: '',
     certificationUrl: ''
@@ -406,7 +406,7 @@ export default function Achievements() {
                   value={newAchievement.type}
                   onValueChange={(value) => setNewAchievement(prev => ({
                     ...prev,
-                    type: value
+                    type: value as 'Tournament' | 'Award' | 'Milestone' | 'Certification' | 'Other'
                   }))}
                 >
                   <SelectTrigger>

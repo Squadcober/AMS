@@ -73,7 +73,7 @@ export async function GET(
     }
 
     // Format assignedPlayersData
-    session.assignedPlayersData = (session.assignedPlayersData || []).map(player => ({
+    session.assignedPlayersData = (session.assignedPlayersData || []).map((player: { _id?: ObjectId; id?: string; name?: string; username?: string; position?: string; }) => ({
       id: player._id?.toString() || player.id,
       name: player.name || player.username || 'Unknown Player',
       position: player.position || 'Not specified'
@@ -169,7 +169,7 @@ export async function PATCH(
           sessionName: updates.name || 'Unknown Session',
           date: new Date().toISOString(),
           attributes: metrics,
-          rating: metrics.sessionRating || 0,
+          rating: (metrics as { sessionRating?: number }).sessionRating || 0,
           isVerified: true,
           verifiedBy: updates.updatedBy || 'system',
           attendance: updates.attendance?.[playerId]?.status === 'Present',
@@ -179,7 +179,7 @@ export async function PATCH(
         const playerUpdateResult = await db.collection('ams-player-data').updateOne(
           { id: playerId },
           {
-            $push: { performanceHistory: performanceEntry },
+            $push: { performanceHistory: { $each: [performanceEntry] } }as any,
             $set: { 
               updatedAt: new Date().toISOString() 
             },

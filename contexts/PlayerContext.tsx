@@ -2,11 +2,45 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-interface Player {
-  id: string;
+export interface Player {
+  id: string | number;
   name: string;
+  position?: string;
+  photoUrl?: string;
   academyId: string;
-  // ... other player properties
+  userId?: string;
+  attributes: {
+    shooting: number;
+    pace: number;
+    positioning: number;
+    passing: number;
+    ballControl: number;
+    crossing: number;
+    [key: string]: any;
+  };
+  performanceHistory?: Array<{
+    date: string;
+    type?: string;
+    attributes: {
+      shooting: number;
+      pace: number;
+      positioning: number;
+      passing: number;
+      ballControl: number;
+      crossing: number;
+      [key: string]: any;
+    };
+    matchId?: string;
+    stats?: {
+      matchPoints?: {
+        current: number;
+        previous?: number;
+      };
+      goals?: number;
+      assists?: number;
+      [key: string]: any;
+    };
+  }>;
 }
 
 export interface PlayerContextType {

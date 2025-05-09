@@ -20,6 +20,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 interface Injury {
   id: string
+  _id?: string
   type: string
   date: string
   treatment: string
@@ -197,7 +198,7 @@ export default function InjuryRehab() {
       try {
         localStorage.setItem(STORAGE_KEY, dataToStore);
       } catch (e) {
-        if (e.name === 'QuotaExceededError') {
+        if (typeof e === "object" && e !== null && "name" in e && (e as any).name === 'QuotaExceededError') {
           // If storage is full, keep only the most recent injury
           const mostRecentInjury = injuriesWithUser[injuriesWithUser.length - 1];
           localStorage.setItem(STORAGE_KEY, JSON.stringify([mostRecentInjury]));
@@ -725,8 +726,8 @@ export default function InjuryRehab() {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            handleViewCertificate(
-                              injury.certificateUrl || injury.certificationUrl
+                            handleViewPdf(
+                              injury.certificateUrl ?? injury.certificationUrl ?? ""
                             )
                           }
                         >
@@ -834,7 +835,7 @@ export default function InjuryRehab() {
                         {injuries[0]?.xrayImages?.[imageIndex] !== '/placeholder.svg' && (
                           <Button
                             variant="destructive"
-                            onClick={() => handleDelete(injuries[0]._id, 'image', imageIndex)}
+                            onClick={() => handleDelete(injuries[0]._id ?? '', 'image', imageIndex)}
                           >
                             Delete
                           </Button>

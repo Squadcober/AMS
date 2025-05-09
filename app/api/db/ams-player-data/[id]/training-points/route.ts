@@ -43,7 +43,7 @@ export async function PATCH(
         },
         $push: {
           performanceHistory: historyEntry
-        }
+        } as any // Cast $push as any to avoid TypeScript type error with MongoDB driver
       }
     );
 

@@ -25,6 +25,8 @@ export interface PlayerAttributes {
 }
 
 export interface Player {
+  feesPaid: any;
+  age: any;
   id: string;
   _id: string;
   userId: string;

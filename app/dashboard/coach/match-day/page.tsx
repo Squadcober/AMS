@@ -152,10 +152,8 @@ const debugPlayerData = (players: any[]) => {
 };
 
 const dialogStyles = {
-  content: {
-    maxWidth: '95vw',
-    width: '1600px',
-  }
+  maxWidth: '95vw',
+  width: '1600px',
 };
 
 export default function MatchDay() {
@@ -234,7 +232,7 @@ export default function MatchDay() {
         }
 
         if (playersData.success && Array.isArray(playersData.data)) {
-          const formattedPlayers = playersData.data.map(player => ({
+          const formattedPlayers = playersData.data.map((player: any) => ({
             ...player,
             id: player._id || player.id,
             name: player.name || player.username || 'Unknown Player',
@@ -428,7 +426,7 @@ export default function MatchDay() {
 
       if (!response.ok) throw new Error('Failed to delete match');
 
-      setMatches(prev => prev.filter(match => match._id !== matchId));
+      setMatches(prev => prev.filter(match => match.id !== matchId));
       
       toast({
         title: "Success",
@@ -504,7 +502,7 @@ export default function MatchDay() {
       
       if (result.success && result.data) {
         setMatches(prev => prev.map(match => 
-          match._id === matchId ? { ...match, ...updates } : match
+          match.id === matchId ? { ...match, ...updates } : match
         ));
 
         toast({
@@ -707,7 +705,7 @@ export default function MatchDay() {
       if (result.success) {
         // Update local state with new stats
         setMatches(prev => prev.map(match => 
-          match._id === matchId ? { ...match, playerStats: updatedStats } : match
+          match.id === matchId ? { ...match, playerStats: updatedStats } : match
         ));
   
         // Update individual player stats
@@ -776,7 +774,7 @@ export default function MatchDay() {
         endTime: match.endTime || ''
       });
       
-      console.log(`Match ${match._id} status:`, matchStatus);
+      console.log(`Match ${match.id} status:`, matchStatus);
       return matchStatus === status;
     });
 
@@ -814,7 +812,7 @@ export default function MatchDay() {
           {filteredMatches.map((match) => {
             console.log('Processing match:', match.id, 'with players:', match.players);
             return (
-              <TableRow key={match._id}>
+              <TableRow key={match.id}>
                 <TableCell>{format(new Date(match.date), "PP")}</TableCell>
                 <TableCell>{match.opponent}</TableCell>
                 <TableCell>{match.venue}</TableCell>
@@ -824,12 +822,12 @@ export default function MatchDay() {
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <Button variant="default" onClick={() => handleViewDetails(match._id)}>
+                  <Button variant="default" onClick={() => handleViewDetails(match.id)}>
                     View Details
                   </Button>
                   <Button 
                     variant="destructive" 
-                    onClick={() => handleDeleteMatch(match._id)}
+                    onClick={() => handleDeleteMatch(match.id)}
                     className="ml-2"
                   >
                     Delete Match
@@ -843,7 +841,7 @@ export default function MatchDay() {
                       min="0"
                       className="w-16"
                       value={match.team1Score ?? ''}
-                      onChange={(e) => handleUpdateScore(match._id, {
+                      onChange={(e) => handleUpdateScore(match.id, {
                         team1Score: parseInt(e.target.value) || 0
                       })}
                     />
@@ -853,7 +851,7 @@ export default function MatchDay() {
                       min="0"
                       className="w-16"
                       value={match.team2Score ?? ''}
-                      onChange={(e) => handleUpdateScore(match._id, {
+                      onChange={(e) => handleUpdateScore(match.id, {
                         team2Score: parseInt(e.target.value) || 0
                       })}
                     />
@@ -861,7 +859,7 @@ export default function MatchDay() {
                 </TableCell>
                 <TableCell>{match.team2 || match.opponent}</TableCell>
                 <TableCell>
-                  {match.status === 'Finished' ? (
+                  {match.status === 'Completed' ? (
                     match.team1Score === match.team2Score ? (
                       <Badge variant="secondary">Match Tied</Badge>
                     ) : (
@@ -889,10 +887,10 @@ export default function MatchDay() {
   };
 
   const renderMatchDetails = () => {
-    const match = matches.find(m => m._id === viewDetailsMatchId || m.id === viewDetailsMatchId);
+    const match = matches.find(m => m.id === viewDetailsMatchId);
     if (!match) {
       console.log('Match not found:', viewDetailsMatchId);
-      console.log('Available matches:', matches.map(m => ({ id: m.id, _id: m._id })));
+      console.log('Available matches:', matches.map(m => ({ id: m.id })));
       return null;
     }
 
@@ -1004,7 +1002,7 @@ export default function MatchDay() {
                   return (
                     <TableRow key={player.id}>
                       <TableCell className="font-medium">{player.name}</TableCell>
-                      <TableCell>{player.position || 'N/A'}</TableCell>
+                      <TableCell>{player.attributes?.position || 'N/A'}</TableCell>
                       <TableCell>{getFormattedValue(currentPoints)}</TableCell>
                       <TableCell>
                         <div className="space-y-2">
@@ -1068,7 +1066,7 @@ export default function MatchDay() {
           </Table>
 
           <Button 
-            onClick={() => handleSaveMatchStats(match._id)}
+            onClick={() => handleSaveMatchStats(match.id)}
             className="mt-4"
             disabled={Object.keys(playerStats).length === 0}
           >

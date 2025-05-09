@@ -63,7 +63,8 @@ const calculateAveragePerformance = (performanceHistory: any[] = []): number => 
     if (entry.attributes) {
       const attributes = Object.values(entry.attributes).filter(val => typeof val === 'number' && val > 0);
       if (attributes.length > 0) {
-        entryScore += attributes.reduce((sum: number, val: number) => sum + val, 0) / attributes.length;
+        const numAttributes = attributes as number[];
+        entryScore += numAttributes.reduce((sum, val) => sum + val, 0) / numAttributes.length;
         validScores++;
       }
     }
@@ -231,7 +232,7 @@ export default function StudentProfile() {
         }
 
         // Rest of the profile loading logic
-        if (user.role !== 'student') {
+        if (user.role !== "student" as typeof user.role) {
           setError('Access denied. Only students can view this page.');
           router.push(`/dashboard/${user.role}/about`);
           return;
@@ -316,9 +317,9 @@ export default function StudentProfile() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-500 mb-2">Access Error</h2>
           <p className="text-white">{error}</p>
-          {user?.role !== 'student' && (
-            <Link href={`/dashboard/${user?.role}/about`} className="mt-4 text-blue-400 hover:text-blue-300">
-              Go to {user?.role} dashboard
+          {user && user.role !== ('student' as typeof user.role) && (
+            <Link href={`/dashboard/${user.role}/about`} className="mt-4 text-blue-400 hover:text-blue-300">
+              Go to {user.role} dashboard
             </Link>
           )}
         </div>
@@ -394,7 +395,7 @@ export default function StudentProfile() {
       const updatedPlayer = await response.json();
 
       // Update local state with new data
-      setPlayerData((prev) => ({
+      setPlayerData((prev: any) => ({
         ...prev,
         ...updatedPlayer,
         attributes: {

@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar';
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import { useRouter } from 'next/navigation';
 import { createAcademy, getAcademies, remove } from '@/lib/db'; // Import MongoDB operations
+import { UserRole } from '@/components/types/auth';
 
 interface Academy {
     id: string;
@@ -18,7 +19,7 @@ export default function AcademyManagement() {
     const router = useRouter();
 
     useEffect(() => {
-        if (!user || user.role !== 'owner') {
+        if (!user || user.role !== UserRole.OWNER) {
             console.error('Unauthorized access. Redirecting...');
             router.push('/auth'); // Redirect if not an owner
         }
@@ -53,7 +54,16 @@ export default function AcademyManagement() {
     const handleAddAcademy = async (e: React.FormEvent) => {
         e.preventDefault();
         if (generatedId && newAcademyName) {
-            const newAcademy = { id: generatedId, name: newAcademyName };
+            const now = new Date().toISOString();
+            const newAcademy = {
+                id: generatedId,
+                name: newAcademyName,
+                location: '', // Provide default or collect from user
+                contact: '',  // Provide default or collect from user
+                email: '',    // Provide default or collect from user
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
             try {
                 const createdAcademy = await createAcademy(newAcademy); // Save to MongoDB
                 if (createdAcademy) {

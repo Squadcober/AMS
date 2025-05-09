@@ -65,7 +65,7 @@ export default function TrainingData() {
 
   useEffect(() => {
     // Check role-based access
-    if (!user || user.role !== 'coach') {
+    if (!user || user.role !== "COACH") {
       router.push('/auth')
       return
     }

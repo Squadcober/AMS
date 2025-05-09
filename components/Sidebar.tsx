@@ -197,7 +197,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
                 {!isCollapsed && (
                   <h2 className="text-lg font-semibold mb-2"></h2>
                 )}
-                {navItems[user.role as keyof typeof navItems]?.map((item) => (
+                {navItems[user.role as unknown as keyof typeof navItems]?.map((item) => (
                   <CustomTooltip 
                     key={item.name} 
                     content={isCollapsed ? item.name : `Go to ${item.name}`}

@@ -59,6 +59,20 @@ export default function ExportData() {
 
     // Mock export function
     const sessions = JSON.parse(localStorage.getItem("ams-sessions") || "[]")
+    // Ensure players are cast to the correct type or mapped to the expected structure
+    const mappedPlayers = players.map((player: any) => ({
+      _id: player._id || player.id,
+      id: player.id,
+      username: player.username || player.name || '',
+      name: player.name || player.username || '',
+      email: player.email || '',
+      role: player.role || '',
+      phone: player.phone || '',
+      academyId: player.academyId || '',
+      // Add any other fields required by the Player type in types/player
+      ...player
+    }));
+
     const csvContent = DataExporter.exportData(
       {
         dataTypes: selectedDataTypes,
@@ -68,7 +82,7 @@ export default function ExportData() {
         dateRange,
       },
       sessions,
-      players,
+      mappedPlayers,
       batches,
       coaches
     )

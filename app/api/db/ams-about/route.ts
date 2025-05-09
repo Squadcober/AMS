@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = false;
+export const fetchCache = 'force-no-store';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

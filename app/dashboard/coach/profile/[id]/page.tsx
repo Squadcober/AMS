@@ -17,7 +17,7 @@ ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, 
 
 export default function CoachProfile() {
   const { id } = useParams()
-  const { players, getPlayerById } = usePlayers()
+  const { players } = usePlayers()
   const { user } = useAuth()
   const { batches } = useBatches()
   const [profileData, setProfileData] = useState<any>(null)
@@ -27,7 +27,8 @@ export default function CoachProfile() {
 
   useEffect(() => {
     if (id) {
-      const player = getPlayerById(Number(id))
+      // Find player by id (number or string)
+      const player = players.find((p: any) => p.id?.toString() === id.toString());
       if (player) {
         setProfileData(player)
         setIsCoachProfile(false)
@@ -41,7 +42,7 @@ export default function CoachProfile() {
         }
       }
     }
-  }, [id, getPlayerById, batches])
+  }, [id, players, batches])
 
   const handleRatingChange = (value: number) => {
     setRating(value)

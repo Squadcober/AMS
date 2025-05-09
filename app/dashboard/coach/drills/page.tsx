@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { usePlayers } from "@/contexts/PlayerContext"
+import type { Player } from "@/contexts/PlayerContext"
 import { useAuth } from "@/contexts/AuthContext"
 import { TimePicker } from "@/components/ui/timepicker"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -84,7 +85,7 @@ export default function DrillsPage() {
         return;
       }
 
-      const academyId = user.academyId || user.academy?.id;
+      const academyId = typeof user.academyId === 'string' ? user.academyId : (user.academyId as { id: string })?.id;
       if (!academyId) {
         console.error('No academyId available in user data:', user);
         toast({
@@ -687,7 +688,7 @@ export default function DrillsPage() {
         const playerData = getPlayerByUserId?.(playerId);
         const currentPoints = playerData?.attributes?.trainingPoints || 0;
 
-        if (points === currentPoints) continue; // Skip if no change
+        if (points === currentPoints) continue;
 
         updates.push(
           fetch(`/api/db/ams-player-data/${playerId}/training-points`, {
@@ -714,15 +715,33 @@ export default function DrillsPage() {
 
       const results = await Promise.all(updates);
       
-      // Update local state with new data
       results.forEach(result => {
-        if (result.success) {
+        if (result.success && result.data) {
           const updatedPlayer = result.data;
-          setPlayers(prev => 
-            prev.map(p => 
-              p._id === updatedPlayer._id ? updatedPlayer : p
-            )
-          );
+          const updatedPlayers = players.map(p => {
+            if (p.id.toString() === (updatedPlayer.id || updatedPlayer._id).toString()) {
+              const attributes = {
+                shooting: updatedPlayer.attributes?.shooting || p.attributes.shooting || 0,
+                pace: updatedPlayer.attributes?.pace || p.attributes.pace || 0,
+                positioning: updatedPlayer.attributes?.positioning || p.attributes.positioning || 0,
+                passing: updatedPlayer.attributes?.passing || p.attributes.passing || 0,
+                ballControl: updatedPlayer.attributes?.ballControl || p.attributes.ballControl || 0,
+                crossing: updatedPlayer.attributes?.crossing || p.attributes.crossing || 0,
+                trainingPoints: updatedPlayer.attributes?.trainingPoints || p.attributes.trainingPoints || 0,
+                ...updatedPlayer.attributes
+              };
+
+              return {
+                ...p,
+                id: updatedPlayer.id || updatedPlayer._id || p.id,
+                name: updatedPlayer.name || p.name,
+                academyId: updatedPlayer.academyId || p.academyId,
+                attributes
+              } satisfies Player;
+            }
+            return p;
+          });
+          setPlayers(updatedPlayers);
         }
       });
 

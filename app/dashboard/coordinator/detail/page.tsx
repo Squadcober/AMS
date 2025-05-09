@@ -10,6 +10,11 @@ import { LineChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip,
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/use-toast"
 
+interface User {
+  role: string;
+  status: string;
+}
+
 interface Stats {
   totalStudents: number;
   totalCoaches: number;
@@ -79,9 +84,9 @@ export default function AdminDetailPage() {
       // Calculate stats with null checks and proper filtering
       const now = new Date();
       const newStats = {
-        totalStudents: users.filter(u => u.role === 'student').length || 0,
-        totalCoaches: users.filter(u => u.role === 'coach').length || 0,
-        totalSessions: sessions.filter(s => {
+        totalStudents: users.filter((u: { role: string }) => u.role === 'student').length || 0,
+        totalCoaches: users.filter((u: { role: string }) => u.role === 'coach').length || 0,
+        totalSessions: sessions.filter((s: { date: string | number | Date; startTime: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } }; endTime: { split: (arg0: string) => { (): any; new(): any; map: { (arg0: NumberConstructor): [any, any]; new(): any } } } }) => {
           const sessionDate = new Date(s.date);
           const [startHour, startMinute] = s.startTime.split(':').map(Number);
           const [endHour, endMinute] = s.endTime.split(':').map(Number);
@@ -94,13 +99,13 @@ export default function AdminDetailPage() {
 
           return now >= sessionStart && now <= sessionEnd;
         }).length || 0,
-        activeStudents: users.filter(u => u.role === 'student' && u.status === 'active').length || 0,
+        activeStudents: users.filter((u: { role: string; status: string }) => u.role === 'student' && u.status === 'active').length || 0,
         revenue: transactions
-          .filter(t => t.type?.toLowerCase() === 'income')
-          .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+          .filter((t: { type: string }) => t.type?.toLowerCase() === 'income')
+          .reduce((sum: number, t: { amount: any }) => sum + (Number(t.amount) || 0), 0),
         expenses: transactions
-          .filter(t => t.type?.toLowerCase() === 'expense')
-          .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+          .filter((t: { type: string }) => t.type?.toLowerCase() === 'expense')
+          .reduce((sum: number, t: { amount: any }) => sum + (Number(t.amount) || 0), 0)
       };
 
       console.log('Calculated stats:', newStats);

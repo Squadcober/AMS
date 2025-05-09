@@ -1,17 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      net: false,
-      tls: false,
-      dns: false,
-      fs: false,
-      async_hooks: false,
-    };
-    config.output.chunkLoadTimeout = 30000; // Increase timeout to 30 seconds
-    return config;
-  },
+  reactStrictMode: true,
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Don't resolve Node.js modules on the client
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        'timers/promises': false,
+        dns: false,
+        dgram: false,
+        'mongodb-client-encryption': false
+      }
+      config.externals = [
+        ...(config.externals || []),
+        'mongodb-client-encryption'
+      ]
+    }
+    return config
+  }
 }
 
 module.exports = nextConfig

@@ -6,7 +6,7 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { usePlayers } from "@/contexts/PlayerContext"
-import type { UserRole } from "@/types/user"
+export type UserRole = "student" | "coach" | "admin" | "coordinator";
 import { CustomTooltip } from "@/components/custom-tooltip"
 
 export default function SignUpPage() {
@@ -19,7 +19,7 @@ export default function SignUpPage() {
   const [academyId, setAcademyId] = useState("")
   const router = useRouter()
   const { register, login } = useAuth()
-  const { addPlayer } = usePlayers()
+  const { players } = usePlayers()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

@@ -79,7 +79,13 @@ export default function Performance() {
   const [playerData, setPlayerData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [chartData, setChartData] = useState({
+  type ChartDataType = {
+    training: { labels: string[]; data: number[] };
+    match: { labels: string[]; data: number[] };
+    attributes: { labels: string[]; data: number[] };
+  };
+
+  const [chartData, setChartData] = useState<ChartDataType>({
     training: { labels: [], data: [] },
     match: { labels: [], data: [] },
     attributes: { labels: [], data: [] }
@@ -124,7 +130,7 @@ export default function Performance() {
         const trainingPerformance = trainingEntries.length > 0
           ? trainingEntries.reduce((acc: number, curr: any) => {
               const attrValues = Object.values(curr.attributes).filter((v: any) => typeof v === 'number' && v > 0);
-              return acc + (attrValues.reduce((sum: number, val: number) => sum + val, 0) / attrValues.length);
+              return acc + ((attrValues as number[]).reduce((sum, val) => sum + val, 0) / attrValues.length);
             }, 0) / trainingEntries.length
           : 0;
 
@@ -134,11 +140,11 @@ export default function Performance() {
         );
 
         const validMatchPoints = matchEntries
-          .map(entry => getMatchPoints(entry))
-          .filter(points => points > 0);
+          .map((entry: any) => getMatchPoints(entry))
+          .filter((points: number) => points > 0);
 
         const matchPerformance = validMatchPoints.length > 0
-          ? validMatchPoints.reduce((sum, points) => sum + points, 0) / validMatchPoints.length
+          ? validMatchPoints.reduce((sum: number, points: number) => sum + points, 0) / validMatchPoints.length
           : 0;
 
         // Calculate match stats
@@ -166,16 +172,16 @@ export default function Performance() {
             date: new Date(entry.date).toLocaleDateString(),
             points: getMatchPoints(entry)
           }))
-          .filter(entry => entry.points > 0); // Only include entries with valid points
+          .filter((entry: any) => entry.points > 0); // Only include entries with valid points
 
         setChartData({
           training: {
-            labels: trainingData.map(d => d.date),
-            data: trainingData.map(d => d.rating)
+            labels: trainingData.map((d: any) => d.date),
+            data: trainingData.map((d: any) => d.rating)
           },
           match: {
-            labels: matchData.map(d => d.date),
-            data: matchData.map(d => d.points)
+            labels: matchData.map((d: { date: string; points: number }) => d.date),
+            data: matchData.map((d: { date: string; points: number }) => d.points)
           },
           attributes: {
             labels: ["Shooting", "Pace", "Positioning", "Passing", "Ball Control", "Crossing"],
@@ -270,7 +276,7 @@ export default function Performance() {
           color: "rgb(255, 255, 255)",
           font: {
             size: 14,
-            weight: 'bold'
+            weight: "bold" as "bold"
           },
           padding: 25, // More spacing around labels
         },

@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest) {
             sessionRating,
             type: 'training'
           }
-        }
+        }as any
       }
     );
 

@@ -24,7 +24,7 @@ export function useSessions(academyId: string) {
       // Try cache first unless force refresh
       if (!forceRefresh) {
         const cached = SessionManager.getCache();
-        if (cached?.length > 0) {
+        if (cached && cached.length > 0) {
           setSessions(cached);
           setIsLoading(false);
           return;
@@ -79,8 +79,8 @@ export function useSessions(academyId: string) {
       console.error('Error fetching sessions:', error);
       // Use cached data as fallback
       const cached = SessionManager.getCache();
-      if (cached?.length > 0) {
-        setSessions(cached);
+      if (cached && cached.length > 0) {
+        setSessions(cached as Session[]);
       }
       setError(error as Error);
     } finally {

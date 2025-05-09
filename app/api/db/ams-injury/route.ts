@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { ObjectId, Document, UpdateFilter } from 'mongodb';
+
+interface PdfFile {
+  name: string;
+  url: string;
+  type: string;
+}
+
+interface InjuryDocument extends Document {
+  _id: ObjectId;
+  playerId: string;
+  academyId: string;
+  xrayImages: string[];
+  prescription: string;
+  pdfFiles: PdfFile[];
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted?: boolean;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,16 +48,25 @@ export async function POST(request: NextRequest) {
         })
       );
 
-      // Update injury with new PDF files
-      const result = await db.collection('ams-injuries').findOneAndUpdate(
-        { _id: new ObjectId(data.injuryId) },
-        {
-          $push: { pdfFiles: { $each: processedFiles } },
-          $set: { updatedAt: new Date() }
+      const updateDoc: any = {
+        $push: {
+          pdfFiles: { $each: processedFiles }
         },
+        $set: { updatedAt: new Date() }
+      };
+
+      const result = await db.collection<InjuryDocument>('ams-injuries').findOneAndUpdate(
+        { _id: new ObjectId(data.injuryId) },
+        updateDoc as any,
         { returnDocument: 'after' }
       );
 
+      if (!result || !result.value) {
+        return NextResponse.json({
+          success: false,
+          error: 'Injury not found'
+        }, { status: 404 });
+      }
       return NextResponse.json({
         success: true,
         data: {
@@ -49,7 +76,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Process files
     const processedFiles = await Promise.all(
       (files as File[]).map(async (file) => {
         const buffer = await file.arrayBuffer();
@@ -62,15 +88,13 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Handle different types of uploads
     if (data.type === 'xray' || data.type === 'prescription') {
-      // Update existing injury
       if (data.injuryId) {
         const updateField = data.type === 'xray' 
           ? `xrayImages.${data.imageIndex}` 
           : 'prescription';
 
-        await db.collection('ams-injuries').updateOne(
+        await db.collection<InjuryDocument>('ams-injuries').updateOne(
           { _id: new ObjectId(data.injuryId) },
           { 
             $set: { 
@@ -80,7 +104,7 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        const updatedInjury = await db.collection('ams-injuries').findOne(
+        const updatedInjury = await db.collection<InjuryDocument>('ams-injuries').findOne(
           { _id: new ObjectId(data.injuryId) }
         );
 
@@ -90,16 +114,15 @@ export async function POST(request: NextRequest) {
         });
       }
     } else if (data.type === 'pdf') {
-      // Add PDFs to existing injury
       if (data.injuryId) {
-        await db.collection('ams-injuries').updateOne(
+        await db.collection<InjuryDocument>('ams-injuries').updateOne(
           { _id: new ObjectId(data.injuryId) },
           { 
             $push: { 
               pdfFiles: { $each: processedFiles }
             },
             $set: { updatedAt: new Date() }
-          }
+          } as any // <-- Add this cast to fix the type error
         );
 
         return NextResponse.json({
@@ -109,8 +132,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create new injury if no injuryId provided
-    const newInjury = {
+    const newInjury: InjuryDocument = {
       ...data,
       xrayImages: ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
       prescription: "/placeholder.svg",
@@ -119,7 +141,7 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date()
     };
 
-    const result = await db.collection('ams-injuries').insertOne(newInjury);
+    const result = await db.collection<InjuryDocument>('ams-injuries').insertOne(newInjury);
 
     return NextResponse.json({
       success: true,
@@ -153,7 +175,7 @@ export async function GET(request: NextRequest) {
     }
 
     const db = await getDatabase();
-    const injuries = await db.collection('ams-injuries')
+    const injuries = await db.collection<InjuryDocument>('ams-injuries')
       .find({
         playerId,
         academyId,
@@ -162,11 +184,9 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    // Format the response to handle both certificate URL formats
     const formattedInjuries = injuries.map(injury => ({
       ...injury,
       _id: injury._id.toString(),
-      // Combine both certificate URL fields into one
       certificationUrl: injury.certificateUrl || injury.certificationUrl || null
     }));
 
@@ -197,7 +217,7 @@ export async function PUT(request: NextRequest) {
     const db = await getDatabase();
     const { _id, ...updateData } = data;
 
-    const result = await db.collection('ams-injuries').findOneAndUpdate(
+    const result = await db.collection<InjuryDocument>('ams-injuries').findOneAndUpdate(
       { _id: new ObjectId(_id) },
       { 
         $set: {
@@ -208,7 +228,7 @@ export async function PUT(request: NextRequest) {
       { returnDocument: 'after' }
     );
 
-    if (!result.value) {
+    if (!result || !result.value) {
       return NextResponse.json({
         success: false,
         error: 'Injury not found'
@@ -242,7 +262,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const db = await getDatabase();
-    await db.collection('ams-injuries').updateOne(
+    await db.collection<InjuryDocument>('ams-injuries').updateOne(
       { _id: new ObjectId(id) },
       { $set: { isDeleted: true } }
     );

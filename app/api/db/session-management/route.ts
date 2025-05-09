@@ -70,8 +70,12 @@ export async function POST(request: Request) {
         });
 
       case 'updateStatus':
+        interface SessionUpdate {
+          _id: string;
+          status: string;
+        }
         const { sessions } = data;
-        const bulkOps = sessions.map(session => ({
+        const bulkOps = sessions.map((session: SessionUpdate) => ({
           updateOne: {
             filter: { _id: new ObjectId(session._id) },
             update: { 

@@ -17,7 +17,7 @@ export async function PATCH(request: NextRequest) {
     const db = client.db(process.env.MONGODB_DB);
 
     // Calculate overall rating based on attributes
-    const overallRating = Object.values(metrics.attributes).reduce((sum: number, val: number) => sum + val, 0) / 6;
+    const overallRating = Object.values(metrics.attributes as Record<string, number>).reduce((sum, val) => sum + val, 0) / 6;
 
     // Update player document
     const result = await db.collection('ams-player-data').updateOne(
@@ -35,7 +35,7 @@ export async function PATCH(request: NextRequest) {
             sessionRating: metrics.sessionRating,
             type: 'training'
           }
-        }
+        }as any,
       }
     );
 

@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { ObjectId, Filter, Document, UpdateFilter } from 'mongodb';
+
+interface Rating {
+  studentId: string;
+  studentInfo: {
+    id: string;
+    name: string;
+    photoUrl: string;
+  };
+  rating: number;
+  date: string;
+  academyId: string;
+}
+
+interface CoachDocument extends Document {
+  ratings: Rating[];
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,13 +32,20 @@ export async function GET(request: NextRequest) {
 
     const db = await getDatabase();
 
-    // First get the coach ratings
+    // Create base query conditions
+    const queryConditions: Filter<Document>['$or'] = [
+      { id: coachId },
+      { userId: coachId }
+    ];
+
+    // Only add ObjectId condition if valid
+    if (ObjectId.isValid(coachId)) {
+      queryConditions.push({ _id: new ObjectId(coachId) });
+    }
+
+    // Find coach with properly typed query
     const coach = await db.collection('ams-coaches').findOne({
-      $or: [
-        { id: coachId },
-        { userId: coachId },
-        { _id: ObjectId.isValid(coachId) ? new ObjectId(coachId) : null }
-      ]
+      $or: queryConditions
     });
 
     if (!coach?.ratings?.length) {
@@ -41,7 +64,7 @@ export async function GET(request: NextRequest) {
         $or: [
           { id: { $in: studentIds } },
           { userId: { $in: studentIds } },
-          { _id: { $in: studentIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id)) } }
+          { _id: { $in: studentIds.filter((id): id is string => typeof id === 'string' && ObjectId.isValid(id)).map(id => new ObjectId(id)) } }
         ]
       })
       .toArray();
@@ -94,12 +117,17 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
 
     // Get student info first
+    const queryConditions: Filter<Document>[] = [
+      { id: studentId },
+      { userId: studentId }
+    ];
+    
+    if (ObjectId.isValid(studentId)) {
+      queryConditions.push({ _id: new ObjectId(studentId) });
+    }
+
     const student = await db.collection('ams-player-data').findOne({
-      $or: [
-        { id: studentId },
-        { userId: studentId },
-        { _id: ObjectId.isValid(studentId) ? new ObjectId(studentId) : null }
-      ]
+      $or: queryConditions
     });
 
     const studentInfo = {
@@ -108,28 +136,46 @@ export async function POST(request: NextRequest) {
       photoUrl: student?.photoUrl || '/placeholder.svg'
     };
 
-    // Update coach ratings
-    const result = await db.collection('ams-coaches').findOneAndUpdate(
-      { 
-        $or: [
-          { id: coachId },
-          { userId: coachId },
-          { _id: ObjectId.isValid(coachId) ? new ObjectId(coachId) : null }
-        ]
-      },
-      {
-        $push: {
-          ratings: {
-            studentId,
-            studentInfo, // Store student info with the rating
-            rating,
-            date,
-            academyId
+    // Build query conditions
+    const coachQueryConditions: Filter<Document>[] = [
+      { id: coachId },
+      { userId: coachId }
+    ];
+
+    // Only add ObjectId condition if valid
+    if (ObjectId.isValid(coachId)) {
+      coachQueryConditions.push({ _id: new ObjectId(coachId) });
+    }
+
+    const updateDoc: UpdateFilter<CoachDocument> = {
+          $push: {
+            ratings: {
+              studentId,
+              studentInfo,
+              rating,
+              date,
+              academyId
+            } as any // Use 'any' to satisfy the MongoDB driver type
+          },
+          $inc: {
+            totalRatings: 1,
+            ratingSum: rating
           }
-        }
-      },
+        };
+
+    // Update coach ratings with properly typed query
+    const result = await db.collection<CoachDocument>('ams-coaches').findOneAndUpdate(
+      { $or: coachQueryConditions },
+      updateDoc,
       { returnDocument: 'after' }
     );
+
+    if (!result) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to update rating'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,

@@ -26,6 +26,18 @@ import { exportToDoc, exportMultipleToDoc } from '@/lib/doc-export';
 import html2canvas from 'html2canvas';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import jsPDF from 'jspdf';
+interface Player {
+  id: string | number;
+  name: string;
+  position?: string;  // Add position property
+  photoUrl?: string;
+  academyId: string;
+  attributes: PlayerAttributes;
+  performanceHistory?: {
+    date: string;
+    attributes: PlayerAttributes;
+  }[];
+}
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, CategoryScale, LinearScale)
 
@@ -63,7 +75,7 @@ interface Position {
   type?: string
 }
 
-interface PlayerAttributes {
+export interface PlayerAttributes {
   shooting: number
   pace: number
   positioning: number
@@ -72,15 +84,9 @@ interface PlayerAttributes {
   crossing: number
 }
 
-interface Player {
-  id: number
-  name: string
-  position: string
-  attributes: PlayerAttributes
-}
-
 interface GamePlan {
   id: string
+  _id?: string  // Add MongoDB's _id field
   name: string
   size: string
   gk: boolean
@@ -492,10 +498,10 @@ export default function TeamBuilder() {
       pdf.setFontSize(12);
   
       // Draw lineup table headers
-      pdf.setFont(undefined, 'bold');
+      pdf.setFont('helvetica', 'bold');
       pdf.text('Position', 20, yPosition);
       pdf.text('Player', 80, yPosition);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       yPosition += 8;
   
       // Add lineup entries
@@ -519,10 +525,10 @@ export default function TeamBuilder() {
       pdf.setFontSize(12);
   
       // Draw substitutes table headers
-      pdf.setFont(undefined, 'bold');
+      pdf.setFont('helvetica', 'bold');
       pdf.text('Position', 20, yPosition);
       pdf.text('Player', 80, yPosition);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       yPosition += 8;
   
       // Add substitute entries
@@ -868,7 +874,7 @@ export default function TeamBuilder() {
             return ["forward", "striker", "attacker", "st"].includes(playerPosition);
           default:
             if (selectedPosition.type) {
-              return player.position.toLowerCase().includes(selectedPosition.type.toLowerCase());
+              return (player.position || '').toLowerCase().includes(selectedPosition.type.toLowerCase());
             }
             return false;
         }
@@ -1561,8 +1567,7 @@ export default function TeamBuilder() {
     if (!user?.academyId || !user?.id) return [];
     
     return batches.filter(batch => {
-      const isUserBatch = batch.coachId === user.id || 
-                         (batch.coachIds && batch.coachIds.includes(user.id));
+      const isUserBatch = batch.coachId === user.id;
       const isSameAcademy = batch.academyId === user.academyId;
       
       return isUserBatch && isSameAcademy;

@@ -118,6 +118,13 @@ export async function PUT(request: NextRequest) {
       { returnDocument: 'after' }
     );
 
+    if (!result) {
+      return NextResponse.json({
+        success: false,
+        error: 'Student not found'
+      }, { status: 404 });
+    }
+
     return NextResponse.json({
       success: true,
       data: result.value

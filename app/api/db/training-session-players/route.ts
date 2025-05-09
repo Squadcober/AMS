@@ -1,33 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDatabase } from '@/lib/mongodb';
+
+// Add these exports to mark the route as dynamic
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const playerIds = searchParams.get('ids')?.split(',');
+    const sessionId = request.nextUrl.searchParams.get('sessionId');
+    const academyId = request.nextUrl.searchParams.get('academyId');
 
-    if (!playerIds || playerIds.length === 0) {
+    if (!sessionId || !academyId) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Player IDs are required' 
+        error: 'Missing required parameters' 
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
+    const db = await getDatabase();
 
-    // Query players using both string IDs and player_* format
+    // Query players based on sessionId and academyId
     const players = await db.collection('ams-player-data')
       .find({
-        $or: [
-          { id: { $in: playerIds } },
-          { _id: { $in: playerIds } },
-          { playerId: { $in: playerIds } }
-        ]
+        sessionId: sessionId,
+        academyId: academyId
       })
       .toArray();
-
-    console.log(`Found ${players.length} players for IDs:`, playerIds);
 
     const formattedPlayers = players.map(player => ({
       ...player,

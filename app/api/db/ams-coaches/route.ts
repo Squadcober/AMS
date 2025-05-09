@@ -13,14 +13,18 @@ export async function GET(request: NextRequest) {
       const client = await clientPromise;
       const db = client.db(process.env.MONGODB_DB);
 
+      const orConditions: Record<string, any>[] = [
+        { id: id },
+        { userId: id },
+        { username: id },
+        { coachId: id }
+      ];
+      if (ObjectId.isValid(id)) {
+        orConditions.push({ _id: new ObjectId(id) });
+      }
+
       const coach = await db.collection('ams-coaches').findOne({
-        $or: [
-          { id: id },
-          { userId: id },
-          { username: id },
-          { coachId: id },
-          { _id: ObjectId.isValid(id) ? new ObjectId(id) : null }
-        ]
+        $or: orConditions
       });
 
       return NextResponse.json({

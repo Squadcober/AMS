@@ -338,7 +338,7 @@ export default function CoachProfilePage() {
                         {rating.studentPhoto ? (
                           <Image
                             src={rating.studentPhoto}
-                            alt={rating.studentName}
+                            alt={rating.studentName || 'Student photo'}
                             width={32}
                             height={32}
                             className="rounded-full mr-2"

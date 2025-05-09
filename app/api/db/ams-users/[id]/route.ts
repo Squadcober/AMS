@@ -13,7 +13,7 @@ export async function GET(
     // Try to find user by both _id and id fields
     const user = await db.collection('ams-users').findOne({
       $or: [
-        { _id: ObjectId.isValid(userId) ? new ObjectId(userId) : null },
+        { _id: { $eq: ObjectId.isValid(userId) ? new ObjectId(userId) : undefined } },
         { id: userId }
       ]
     });

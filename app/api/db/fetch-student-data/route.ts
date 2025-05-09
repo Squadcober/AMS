@@ -1,25 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { getDatabase } from '@/lib/mongodb';
+
+// Add these exports to mark the route as dynamic
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const academyId = searchParams.get('academyId');
+    const studentId = request.nextUrl.searchParams.get('studentId');
+    const academyId = request.nextUrl.searchParams.get('academyId');
 
-    if (!userId || !academyId) {
-      return NextResponse.json({
-        success: false,
-        error: 'User ID and Academy ID are required',
+    if (!studentId || !academyId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Missing required parameters' 
       }, { status: 400 });
     }
 
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
+    const db = await getDatabase();
 
     // Fetch player data
     const playerData = await db.collection('ams-player-data').findOne({
-      userId,
+      userId: studentId,
       academyId,
       isDeleted: { $ne: true },
     });
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
     if (!playerData && !academyData) {
       return NextResponse.json({
         success: false,
-        error: 'No data found for the given User ID and Academy ID',
+        error: 'No data found for the given Student ID and Academy ID',
       }, { status: 404 });
     }
 

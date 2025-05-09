@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
           { id: { $in: Array.from(coachIds) } },
           { _id: { $in: Array.from(coachIds).map(id => {
             try { return new ObjectId(id); } catch { return null; }
-          }).filter(Boolean) } }
+          }).filter((id): id is ObjectId => id !== null) } }
         ],
         role: 'coach'
       })

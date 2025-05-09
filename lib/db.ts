@@ -1,6 +1,15 @@
 import { MongoClient, ObjectId } from 'mongodb'
-import clientPromise from './mongodb'
+import clientPromise, { getCollection } from './mongodb'
 import type { Academy, Player, User, Session } from '@/types/models'
+import { cache } from 'react'
+
+export const getDb = cache(async () => {
+  if (typeof window !== 'undefined') {
+    throw new Error('Database access not allowed on client side')
+  }
+  const client = await clientPromise
+  return client.db(process.env.MONGODB_DB)
+})
 
 // Client-side database utility
 

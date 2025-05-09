@@ -27,6 +27,13 @@ export async function POST(request: NextRequest) {
       _id: result.insertedId
     });
 
+    if (!createdBatch) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to fetch created batch'
+      }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
       data: {

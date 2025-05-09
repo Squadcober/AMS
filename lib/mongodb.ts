@@ -15,35 +15,43 @@ const cache = new LRUCache({
   }
 });
 
-const MONGODB_URI = process.env.MONGODB_URI as string;
-const MONGODB_DB = process.env.MONGODB_DB as string;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI environment variable');
+if (!process.env.MONGODB_URI) {
+  throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
 }
 
-if (!MONGODB_DB) {
-  throw new Error('Please define MONGODB_DB environment variable');
-}
-
-const options = {}; // Remove deprecated options
+const uri = process.env.MONGODB_URI;
+const options = {
+  // Removed directConnection and family for SRV URIs
+};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
-if (process.env.NODE_ENV === 'development') {
-  let globalWithMongo = global as typeof globalThis & {
-    _mongoClientPromise?: Promise<MongoClient>;
-  };
+if (typeof window === 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    let globalWithMongo = global as typeof globalThis & {
+      _mongoClientPromise?: Promise<MongoClient>;
+    };
 
-  if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(MONGODB_URI, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+    if (!globalWithMongo._mongoClientPromise) {
+      client = new MongoClient(uri, options);
+      globalWithMongo._mongoClientPromise = client.connect()
+        .catch(err => {
+          console.error('Failed to connect to MongoDB:', err);
+          throw err;
+        });
+    }
+    clientPromise = globalWithMongo._mongoClientPromise;
+  } else {
+    client = new MongoClient(uri, options);
+    clientPromise = client.connect()
+      .catch(err => {
+        console.error('Failed to connect to MongoDB:', err);
+        throw err;
+      });
   }
-  clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  client = new MongoClient(MONGODB_URI, options);
-  clientPromise = client.connect();
+  throw new Error('MongoDB client cannot be initialized on the client side');
 }
 
 export async function connectWithRetry(retries = 3): Promise<MongoClient> {
@@ -62,7 +70,7 @@ export async function connectWithRetry(retries = 3): Promise<MongoClient> {
 
 export async function getDatabase() {
   const client = await connectWithRetry();
-  return client.db(MONGODB_DB);
+  return client.db(process.env.MONGODB_DB as string);
 }
 
 export async function createIndexes() {
@@ -114,6 +122,36 @@ export async function queryCached(key: string, queryFn: () => Promise<any>) {
   const result = await queryFn();
   cache.set(key, result);
   return result;
+}
+
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB as string);
+    await db.command({ ping: 1 });
+    return true;
+  } catch (error) {
+    console.error('Database connection check failed:', error);
+    return false;
+  }
+}
+
+export async function connectToDatabase() {
+  if (!process.env.MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable');
+  }
+  if (!process.env.MONGODB_DB) {
+    throw new Error('Please define the MONGODB_DB environment variable');
+  }
+
+  try {
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB as string);
+    return { client, db };
+  } catch (error) {
+    console.error('Failed to connect to database:', error);
+    throw new Error('Unable to connect to database');
+  }
 }
 
 export default clientPromise;

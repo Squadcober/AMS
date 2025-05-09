@@ -438,7 +438,7 @@ export default function SearchPage() {
                                       }
                                       return attrs
                                         ? Object.entries(attrs).map(([k, v]) => (
-                                            <span key={k} className="bg-gray-100 text-gray-800 rounded px-2 py-1 text-sm">{k}: {v}</span>
+                                            <span key={k} className="bg-gray-100 text-gray-800 rounded px-2 py-1 text-sm">{k}: {typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
                                           ))
                                         : "N/A";
                                     })()}
@@ -596,10 +596,7 @@ export default function SearchPage() {
                                       <div>
                                         <span className="font-bold block">Username:</span>
                                         <span>
-                                          {user.username ||
-                                            coachUserInfo.username ||
-                                            coachUserInfo.name ||
-                                            "N/A"}
+                                          {getDisplayUsername(user, playerDetails, coachUserInfo)}
                                         </span>
                                       </div>
                                       <div>

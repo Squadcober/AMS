@@ -82,7 +82,7 @@ const navItems = {
     { name: "User Management", href: "/dashboard/coordinator/user-management" },
     { name: "logout", href: "/auth" },
   ],
-  owner: [
+  OWNER: [
     { name: "Sessions", href: "/dashboard/Owner/sessions" },
     { name: "Match Day", href: "/dashboard/Owner/match-day" },
     { name: "Attendance", href: "/dashboard/Owner/attendance" },

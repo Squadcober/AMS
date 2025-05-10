@@ -1,5 +1,3 @@
-'use server'
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';

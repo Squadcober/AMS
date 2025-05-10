@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { UserRole } from '@/components/types/auth';
 
 interface Session {
     _id: string;
@@ -26,28 +27,39 @@ export default function OwnerSessionsPage() {
     const [academyMap, setAcademyMap] = useState<Record<string, string>>({});
     const [coachMap, setCoachMap] = useState<Record<string, string>>({});
     const [visibleCount, setVisibleCount] = useState(20);
-    const { user } = useAuth();
+    const [isAuthChecking, setIsAuthChecking] = useState(true);
+    const { user, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!user || String(user.role) !== 'owner') {
+        if (isLoading) {
+            return;
+        }
+
+        if (!user) {
             router.push('/auth');
             return;
         }
+
+        const isOwner = user.role === UserRole.OWNER;
+        if (!isOwner) {
+            router.push('/auth');
+            return;
+        }
+
+        setIsAuthChecking(false);
 
         const fetchAllSessions = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
-                // Fetch all academies
                 const academyRes = await fetch('/api/db/ams-academy');
                 const academyData = await academyRes.json();
                 if (!academyData.success) throw new Error('Failed to fetch academies');
                 const academies = academyData.data;
                 const academyIds = academies.map((a: any) => a.id || a._id);
 
-                // Build academyId -> name map
                 const academyMap: Record<string, string> = {};
                 academies.forEach((a: any) => {
                     if (a.id) academyMap[a.id] = a.name;
@@ -55,7 +67,6 @@ export default function OwnerSessionsPage() {
                 });
                 setAcademyMap(academyMap);
 
-                // Fetch all users (for coach name lookup)
                 const usersRes = await fetch('/api/db/ams-users');
                 const usersData = await usersRes.json();
                 const coachMap: Record<string, string> = {};
@@ -74,7 +85,6 @@ export default function OwnerSessionsPage() {
                     return;
                 }
 
-                // Fetch sessions for each academyId
                 const sessionPromises = academyIds
                     .filter(Boolean)
                     .map((academyId: string) =>
@@ -83,24 +93,19 @@ export default function OwnerSessionsPage() {
                             .catch(() => ({ success: false, data: [] }))
                     );
                 const sessionResults = await Promise.all(sessionPromises);
-                // Combine all sessions from successful responses
                 const allSessions = sessionResults
                     .filter(r => r.success && Array.isArray(r.data))
                     .flatMap(r => r.data);
 
-                // Remove duplicates by _id or id
                 const uniqueSessionsMap = new Map<string, any>();
                 allSessions.forEach((session: any) => {
                     if (session && (session._id || session.id)) uniqueSessionsMap.set(session._id || session.id, session);
                 });
                 const uniqueSessions = Array.from(uniqueSessionsMap.values());
 
-                // Format sessions
                 const formattedSessions = (uniqueSessions || []).map((session: any) => {
                     const sessionDate = new Date(session.date);
-                    // Use date+startTime+endTime to determine status
                     const status = calculateSessionStatus(sessionDate, session.startTime, session.endTime);
-                    // Try to get coach name from createdBy or coachId
                     let coachName = "";
                     if (session.createdBy && coachMap[session.createdBy]) {
                         coachName = coachMap[session.createdBy];
@@ -124,7 +129,6 @@ export default function OwnerSessionsPage() {
                     };
                 });
 
-                // Sort sessions by date (most recent first)
                 const sortedSessions = formattedSessions.sort((a, b) =>
                     new Date(b.date).getTime() - new Date(a.date).getTime()
                 );
@@ -139,9 +143,8 @@ export default function OwnerSessionsPage() {
         };
 
         fetchAllSessions();
-    }, [user, router]);
+    }, [user, isLoading, router]);
 
-    // Use date+startTime+endTime to determine status
     const calculateSessionStatus = (sessionDate: Date, startTime?: string, endTime?: string) => {
         const now = new Date();
         let start = new Date(sessionDate);
@@ -169,12 +172,23 @@ export default function OwnerSessionsPage() {
 
     const visibleSessions = filteredSessions.slice(0, visibleCount);
 
-    if (loading) {
+    if (isAuthChecking || loading) {
         return (
             <div className="flex min-h-screen bg-gray-900">
                 <Sidebar />
                 <div className="flex-1 p-8 flex items-center justify-center">
                     <div className="text-white text-xl">Loading sessions...</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex min-h-screen bg-gray-900">
+                <Sidebar />
+                <div className="flex-1 p-8 flex items-center justify-center">
+                    <div className="text-red-500 text-xl">{error}</div>
                 </div>
             </div>
         );
@@ -201,12 +215,6 @@ export default function OwnerSessionsPage() {
                             className="px-3 py-2 rounded bg-gray-700 text-white w-full max-w-xs"
                         />
                     </div>
-
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded text-red-300">
-                            {error}
-                        </div>
-                    )}
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-white">

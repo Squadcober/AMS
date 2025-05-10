@@ -95,7 +95,7 @@ export default function AcademyManagement() {
 
     return (
         <div className="flex min-h-screen bg-gray-900">
-            <Sidebar /> {/* Ensure Sidebar is displayed */}
+            <Sidebar /> 
             <div className="flex-1 p-8">
                 <div className="bg-gray-800 rounded-lg shadow-md p-6">
                     <form onSubmit={handleAddAcademy} className="space-y-6">

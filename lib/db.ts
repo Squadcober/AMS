@@ -1,5 +1,3 @@
-'use server'
-
 import { getCollection, getClientPromise } from './mongodb'
 import type { Academy, User, Session } from '@/types/models'
 import { cache } from 'react'
@@ -100,26 +98,33 @@ export async function createAcademy(academy: Academy) {
   }
 }
 
-export async function getAcademies() {
+export async function getAcademies(baseUrl?: string) {
   try {
-    const response = await fetch('/api/db/ams-academy');
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch academies');
-    }
-    const result = await response.json();
+    // Construct full URL if baseUrl is provided (for server-side calls)
+    const url = baseUrl 
+      ? new URL('/api/db/ams-academy', baseUrl).toString()
+      : '/api/db/ams-academy';
 
-    // Ensure the response is an array
-    if (Array.isArray(result)) {
-      return result;
-    } else if (result.data && Array.isArray(result.data)) {
-      return result.data;
-    } else {
-      console.error('Unexpected response format:', result);
-      return [];
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch academies');
+    }
+
+    return result.data;
   } catch (error) {
-    console.error('Error fetching academies:', error);
+    console.error('Error loading academies:', error);
     throw error;
   }
 }

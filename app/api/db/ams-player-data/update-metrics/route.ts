@@ -1,5 +1,3 @@
-'use server'
-
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
@@ -24,7 +22,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update player document
     const result = await db.collection('ams-player-data').updateOne(
-      { _id: new ObjectId(playerId) },
+      { id: new ObjectId(playerId) },
       {
         $set: {
           attributes: metrics.attributes,

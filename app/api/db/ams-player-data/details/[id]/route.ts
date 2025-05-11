@@ -1,4 +1,3 @@
-'use server'
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
@@ -16,7 +15,7 @@ export async function GET(
     let player;
     try {
       player = await db.collection('ams-player-data').findOne({
-        _id: new ObjectId(params.id)
+        id: new ObjectId(params.id)
       });
     } catch {
       // If ObjectId conversion fails, try finding by string id
@@ -35,7 +34,7 @@ export async function GET(
     // Format the response
     const formattedPlayer = {
       ...player,
-      id: player._id.toString(),
+      id: player.id.toString(),
       _id: player._id.toString(),
       performanceHistory: (player.performanceHistory || []).sort((a: any, b: any) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()

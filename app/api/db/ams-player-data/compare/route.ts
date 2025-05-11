@@ -1,4 +1,3 @@
-'use server'
 
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
@@ -20,7 +19,7 @@ export async function GET(request: Request) {
     const db = await getDatabase();
     const players = await db.collection('ams-player-data')
       .find({
-        _id: { $in: playerIds.map(id => new ObjectId(id)) },
+        id: { $in: playerIds.map(id => new ObjectId(id)) },
         academyId,
         isDeleted: { $ne: true }
       })

@@ -15,7 +15,7 @@ export async function PATCH(
 
     // First get current player data
     const player = await db.collection('ams-player-data').findOne({
-      _id: new ObjectId(params.id)
+      id: new ObjectId(params.id)
     });
 
     if (!player) {
@@ -37,7 +37,7 @@ export async function PATCH(
 
     // Update player document
     const result = await db.collection('ams-player-data').updateOne(
-      { _id: new ObjectId(params.id) },
+      { id: new ObjectId(params.id) },
       {
         $set: {
           'attributes.trainingPoints': points,
@@ -55,7 +55,7 @@ export async function PATCH(
 
     // Get updated player data
     const updatedPlayer = await db.collection('ams-player-data').findOne({
-      _id: new ObjectId(params.id)
+      id: new ObjectId(params.id)
     });
 
     return NextResponse.json({

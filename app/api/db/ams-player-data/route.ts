@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       const playerIds = ids.split(',');
       query = {
         $or: [
-          { _id: { $in: playerIds.map(id => {
+          { id: { $in: playerIds.map(id => {
             try { return new ObjectId(id); } catch { return null; }
           }).filter(Boolean) } },
           { userId: { $in: playerIds } },
@@ -46,8 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Ensure consistent data structure
     const formattedPlayers = players.map(player => ({
-      _id: player._id.toString(),
-      id: player.id || player._id.toString(),
+      id: player.id || player.id.toString(),
       userId: player.userId,
       username: player.username,
       name: player.name || player.username || 'Unknown Player',
@@ -82,10 +81,10 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { playerId, attributes, performanceHistory } = data;
 
-    if (!playerId) {
+    if (!playerId || !playerId.startsWith('player_')) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Player ID is required' 
+        error: 'Player ID is required and must start with "player_"' 
       }, { status: 400 });
     }
 
@@ -112,13 +111,9 @@ export async function PUT(request: NextRequest) {
       updateData['averagePerformance'] = averagePerformance;
     }
 
+    // Only update by string id field
     const result = await db.collection('ams-player-data').updateOne(
-      { 
-        $or: [
-          { _id: ObjectId.isValid(playerId) ? new ObjectId(playerId) : undefined },
-          { id: playerId }
-        ]
-      },
+      { id: playerId },
       { $set: updateData }
     );
 

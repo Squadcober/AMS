@@ -1,4 +1,3 @@
-'use server'
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
@@ -42,7 +41,7 @@ export async function PATCH(request: NextRequest) {
     // Update player document with new attributes and add to performance history
     const result = await db.collection('ams-player-data').updateOne(
       { 
-        _id: new ObjectId(playerId),
+        id: new ObjectId(playerId),
         academyId // Ensure we're updating the correct academy's player
       },
       {
@@ -66,7 +65,7 @@ export async function PATCH(request: NextRequest) {
 
     // Get the updated player document
     const updatedPlayer = await db.collection('ams-player-data').findOne({
-      _id: new ObjectId(playerId)
+      id: new ObjectId(playerId)
     });
 
     return NextResponse.json({ 

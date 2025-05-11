@@ -279,7 +279,6 @@ export default function StudentProfile() {
 
         // Set edited data
         setEditedData({
-          name: data.name || "",
           age: data.age || 0,
           position: data.position || "",
           playingStyle: data.playingStyle || "",
@@ -358,33 +357,20 @@ export default function StudentProfile() {
 
   const handleSave = async () => {
     try {
-      if (!playerData?._id) {
+      if (!playerData?.id) {
         throw new Error('Player ID not found');
       }
 
-      // Get the latest attributes from performanceHistory
-      const latestPerformance = playerData.performanceHistory?.[playerData.performanceHistory.length - 1];
-      const latestAttributes = latestPerformance?.attributes || {};
-
-      // Merge the latest attributes into the main attributes
-      const updatedAttributes = {
-        ...playerData.attributes, // Existing attributes
-        ...latestAttributes, // Latest attributes from performanceHistory
-        ...editedData.attributes, // Updated attributes (if any)
-      };
-
-      const updatedData = {
+      const updates = {
         ...playerData,
         ...editedData,
-        updatedAt: new Date().toISOString(),
-        attributes: updatedAttributes, // Use merged attributes
+        updatedAt: new Date().toISOString()
       };
 
-      // Update player data in MongoDB
-      const response = await fetch(`/api/db/ams-player-data/${playerData._id}`, {
+      const response = await fetch(`/api/db/ams-player-data/${playerData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData),
+        body: JSON.stringify(updates),
       });
 
       if (!response.ok) {
@@ -392,24 +378,30 @@ export default function StudentProfile() {
         throw new Error(error.error || 'Failed to update profile');
       }
 
-      const updatedPlayer = await response.json();
+      const { data: updatedPlayer } = await response.json();
 
-      // Update local state with new data
-      setPlayerData((prev: any) => ({
-        ...prev,
-        ...updatedPlayer,
-        attributes: {
-          ...updatedPlayer.attributes,
-          overall: calculateOverallRating(updatedPlayer.attributes),
-          averagePerformance: calculateAveragePerformance(updatedPlayer.performanceHistory),
-        },
-      }));
+      // Update local state with the latest data from server
+      setPlayerData({
+        ...updatedPlayer
+      });
 
+      // Reset editedData to match updated player data
+      setEditedData({
+        name: updatedPlayer.name || "",
+        age: updatedPlayer.age || 0,
+        position: updatedPlayer.position || "",
+        playingStyle: updatedPlayer.playingStyle || "",
+        photoUrl: updatedPlayer.photoUrl || "",
+      });
+
+      // Ensure edit mode is exited
       setIsEditing(false);
+
       toast({
         title: 'Success',
         description: 'Profile updated successfully',
       });
+
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
@@ -485,7 +477,26 @@ export default function StudentProfile() {
                   OVR {calculateOverallRating(playerData?.attributes)}%
                 </Badge>
                 {isEditing ? (
-                  <Button onClick={handleSave}>Save</Button>
+                  <div className="space-x-2">
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditedData({
+                          name: playerData.name || "",
+                          age: playerData.age || 0,
+                          position: playerData.position || "",
+                          playingStyle: playerData.playingStyle || "",
+                          photoUrl: playerData.photoUrl || "",
+                        });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSave}>
+                      Save Changes
+                    </Button>
+                  </div>
                 ) : (
                   <Button onClick={() => {
                     setEditedData({

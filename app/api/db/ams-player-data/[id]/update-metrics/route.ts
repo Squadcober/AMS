@@ -23,7 +23,7 @@ export async function PATCH(
 
     // Update player's current attributes and add to performance history
     const result = await db.collection('ams-player-data').updateOne(
-      { _id: new ObjectId(params.id) },
+      { id: new ObjectId(params.id) },
       {
         $set: {
           attributes: metrics.attributes,

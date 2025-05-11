@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
-import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
 
 // Add in-memory cache
 const CACHE: { [key: string]: { data: any, timestamp: number } } = {};
@@ -149,21 +147,16 @@ export async function PUT(
 ) {
   try {
     const playerId = params.id;
-
-    if (!ObjectId.isValid(playerId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid player ID' },
-        { status: 400 }
-      );
-    }
+    console.log('Updating player:', playerId);
 
     const updates = await request.json();
-    const db = await getDatabase();
+    const client = await getClientPromise();
+    const db = client.db(process.env.MONGODB_DB);
 
-    // Fetch the existing player data
-    const existingPlayer = await db.collection('ams-player-data').findOne({
-      _id: new ObjectId(playerId),
-    });
+    // Get existing player data first
+    const existingPlayer = await db.collection('ams-player-data').findOne(
+      { id: playerId }
+    );
 
     if (!existingPlayer) {
       return NextResponse.json(
@@ -172,36 +165,46 @@ export async function PUT(
       );
     }
 
-    // Merge existing attributes with updates
+    // Remove _id from updates to avoid modification error
+    const { _id, ...updateData } = updates;
+
+    // Merge attributes carefully
     const updatedAttributes = {
-      ...existingPlayer.attributes, // Existing attributes
-      ...updates.attributes, // Updated attributes
+      ...existingPlayer.attributes,
+      ...updateData.attributes,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Prepare update document
+    const updateDoc = {
+      ...updateData,
+      attributes: updatedAttributes,
+      updatedAt: new Date().toISOString()
     };
 
     // Update the player document
-    const result = await db.collection('ams-player-data').findOneAndUpdate(
-      { _id: new ObjectId(playerId) },
-      {
-        $set: {
-          ...updates,
-          attributes: updatedAttributes, // Use merged attributes
-          updatedAt: new Date().toISOString(),
-        },
-      },
-      { returnDocument: 'after' }
+    await db.collection('ams-player-data').updateOne(
+      { id: playerId },
+      { $set: updateDoc }
     );
 
-    if (!result?.value) {
+    // Always fetch the latest player data to return
+    const updatedPlayer = await db.collection('ams-player-data').findOne(
+      { id: playerId }
+    );
+
+    if (!updatedPlayer) {
       return NextResponse.json(
-        { success: false, error: 'Failed to update player data' },
+        { success: false, error: 'Failed to fetch updated player data' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      data: result.value,
+      data: updatedPlayer,
     });
+
   } catch (error) {
     console.error('Error updating player data:', error);
     return NextResponse.json(

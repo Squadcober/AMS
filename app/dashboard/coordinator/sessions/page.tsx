@@ -1787,7 +1787,7 @@ const renderSessionTable = (status: Session["status"] | "All") => {
                     <Button variant="default" onClick={() => {
                       if (session.isRecurring) {
                         if (status === "Finished") {
-                          handleViewFinishedOccurrences(session.id);
+                          handleViewFinishedOccurrences(session.id, user);  // Pass user here
                         } else if (status === "Upcoming") {
                           handleViewUpcomingOccurrences(session.id);
                         } else {
@@ -1902,8 +1902,10 @@ const splitRecurringSession = (session: Session) => {
 };
 
 // Update the handleViewFinishedOccurrences function
-const handleViewFinishedOccurrences = async (parentId: number) => {
-  const { user } = useAuth(); // Ensure user is retrieved from useAuth
+const handleViewFinishedOccurrences = async (
+  parentId: number, 
+  user: { academyId?: string } | null
+) => {
   try {
     if (!user?.academyId) {
       toast({
@@ -1939,7 +1941,11 @@ const handleViewFinishedOccurrences = async (parentId: number) => {
     const now = new Date();
     const finishedOccurrences = allOccurrences
       .map((occurrence: Session) => {
-        const occurrenceDate = new Date(occurrence.date);
+        // Adjust the date to handle timezone offset
+        let occurrenceDate = new Date(occurrence.date);
+        // Add one day to adjust for timezone offset (if needed)
+        occurrenceDate.setDate(occurrenceDate.getDate() + 1);
+        
         const [endHour, endMinute] = occurrence.endTime.split(':').map(Number);
         const sessionEnd = new Date(occurrenceDate);
         sessionEnd.setHours(endHour, endMinute, 0);
@@ -1948,6 +1954,7 @@ const handleViewFinishedOccurrences = async (parentId: number) => {
         if (now > sessionEnd) {
           return {
             ...occurrence,
+            date: occurrenceDate.toISOString().split('T')[0], // Use adjusted date
             status: "Finished" as const
           };
         }
@@ -2428,52 +2435,52 @@ const handleConfirmExport = async () => {
     setVisibleSessionsCount(10)
   }, [activeLog, searchTerm])
 
-const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
-  const cacheKey = `${playerId}-${sessionId}`;
-  const now = Date.now();
-
-  // Return cached data if available and not expired
-  if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) {
-    return metricsCache[cacheKey].data;
-  }
-
-  try {
-    // First try to get session-specific metrics
-    const session = sessions.find(s => s.id === sessionId);
-    const sessionMetrics = session?.playerMetrics?.[playerId];
-
-    // Get player's current metrics from MongoDB
-    const response = await fetch(`/api/db/ams-player-data/${playerId}/metrics`);
-    if (!response.ok) throw new Error('Failed to fetch player data');
-    const playerData = await response.json();
-
-    const metrics = {
-      shooting: sessionMetrics?.shooting?.toString() || playerData?.data?.attributes?.shooting?.toString() || "0",
-      pace: sessionMetrics?.pace?.toString() || playerData?.data?.attributes?.pace?.toString() || "0",
-      positioning: sessionMetrics?.positioning?.toString() || playerData?.data?.attributes?.positioning?.toString() || "0",
-      passing: sessionMetrics?.passing?.toString() || playerData?.data?.attributes?.passing?.toString() || "0",
-      ballControl: sessionMetrics?.ballControl?.toString() || playerData?.data?.attributes?.ballControl?.toString() || "0",
-      crossing: sessionMetrics?.crossing?.toString() || playerData?.data?.attributes?.crossing?.toString() || "0",
-      sessionRating: sessionMetrics?.sessionRating?.toString() || "0"
-    };
-
-    // Cache the metrics
-    metricsCache[cacheKey] = {
-      data: metrics,
-      timestamp: now,
-      isDirty: false
-    };
-
-    return metrics;
-  } catch (error) {
-    console.error('Error getting player metrics:', error);
-    return metricsCache[cacheKey]?.data || {
-      shooting: "0", pace: "0", positioning: "0",
-      passing: "0", ballControl: "0", crossing: "0",
-      sessionRating: "0"
-    };
-  }
-};
+  const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
+    const cacheKey = `${playerId}-${sessionId}`;
+    const now = Date.now();
+  
+    // Return cached data if available and not expired
+    if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) { // 5 minutes
+      return metricsCache[cacheKey].data;
+    }
+  
+    try {
+      // First try to get session-specific metrics
+      const session = sessions.find(s => s.id === sessionId);
+      const sessionMetrics = session?.playerMetrics?.[playerId];
+  
+      // Get player's current attributes from MongoDB
+      const response = await fetch(`/api/db/ams-player-data/${playerId}`);
+      if (!response.ok) throw new Error('Failed to fetch player data');
+      const playerData = await response.json();
+  
+      const metrics = {
+        shooting: sessionMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
+        pace: sessionMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
+        positioning: sessionMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
+        passing: sessionMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
+        ballControl: sessionMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
+        crossing: sessionMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
+        sessionRating: sessionMetrics?.sessionRating?.toString() || "0"
+      };
+  
+      // Cache the metrics
+      metricsCache[cacheKey] = {
+        data: metrics,
+        timestamp: now,
+        isDirty: false
+      };
+  
+      return metrics;
+    } catch (error) {
+      console.error('Error getting player metrics:', error);
+      return metricsCache[cacheKey]?.data || {
+        shooting: "0", pace: "0", positioning: "0",
+        passing: "0", ballControl: "0", crossing: "0",
+        sessionRating: "0"
+      };
+    }
+  };
   
   const handleMetricsClick = async (playerId: string, playerName: string, sessionId: number) => {
     try {
@@ -2497,6 +2504,7 @@ const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sess
     }
   };
 
+// Update the handleSaveMetrics function
 const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToSave: any) => {
   try {
     if (!metricsToSave || !sessionId || !playerId || !user?.academyId) {
@@ -2514,33 +2522,14 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
 
     const sessionRating = Math.min(Math.max(Number(metricsToSave.sessionRating || 0), 0), 10);
 
+    // Calculate overall
     const overall = Math.round(
       Object.values(numericMetrics).reduce((sum, val) => sum + val, 0) / 
       Object.keys(numericMetrics).length
     );
 
-    // First, update the session metrics
-    const sessionResponse = await fetch(`/api/db/ams-sessions/${sessionId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        playerMetrics: {
-          [playerId]: {
-            ...numericMetrics,
-            sessionRating,
-            overall,
-          },
-        },
-        updatedBy: user.id,
-      }),
-    });
-
-    if (!sessionResponse.ok) {
-      throw new Error('Failed to update session metrics');
-    }
-
-    // Then, update the player's performance history
-    const playerResponse = await fetch(`/api/db/ams-player-data/update-session-metrics`, {
+    // Update the session metrics first
+    const sessionResponse = await fetch(`/api/db/ams-player-data/update-session-metrics`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2555,8 +2544,46 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
       }),
     });
 
-    if (!playerResponse.ok) {
-      throw new Error('Failed to update player performance history');
+    if (!sessionResponse.ok) {
+      throw new Error('Failed to update metrics');
+    }
+
+    // Update the session state locally
+    setSessions(prev => prev.map(session => {
+      if (session.id === sessionId) {
+        return {
+          ...session,
+          playerMetrics: {
+            ...session.playerMetrics,
+            [playerId]: {
+              ...numericMetrics,
+              sessionRating,
+              overall,
+              updatedAt: new Date().toISOString()
+            }
+          }
+        };
+      }
+      return session;
+    }));
+
+    // If we have a view details session open, update it too
+    if (viewDetailsSessionData && viewDetailsSessionData.id === sessionId) {
+      setViewDetailsSessionData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          playerMetrics: {
+            ...prev.playerMetrics,
+            [playerId]: {
+              ...numericMetrics,
+              sessionRating,
+              overall,
+              updatedAt: new Date().toISOString()
+            }
+          }
+        };
+      });
     }
 
     toast({
@@ -2578,145 +2605,147 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
   }
 };
 
-  // Update the PlayerMetricsDialog component
-  const PlayerMetricsDialog = () => {
-    const [localMetrics, setLocalMetrics] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const dialogRef = useRef<{ hasLoaded: boolean }>({ hasLoaded: false });
-  
-    useEffect(() => {
-      const loadMetrics = async () => {
-        if (!selectedPlayerForMetrics || dialogRef.current.hasLoaded) return;
-  
-        setIsLoading(true);
-        try {
-          const session = sessions.find(s => s.id === selectedPlayerForMetrics.sessionId);
-          if (!session) {
-            console.error('Session not found for metrics dialog');
-            return;
-          }
-  
-          // Fetch metrics from session's playerMetrics or fallback to player's original attributes
-          const playerMetrics = session.playerMetrics?.[selectedPlayerForMetrics.id];
-          const playerData = mongoPlayers.find(p => p.id === selectedPlayerForMetrics.id);
-  
-          const metrics = {
-            shooting: playerMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
-            pace: playerMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
-            positioning: playerMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
-            passing: playerMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
-            ballControl: playerMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
-            crossing: playerMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
-            sessionRating: playerMetrics?.sessionRating?.toString() || "0",
-          };
-  
-          setLocalMetrics(metrics);
-          dialogRef.current.hasLoaded = true;
-        } catch (error) {
-          console.error('Error loading metrics:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load player metrics",
-            variant: "destructive",
-          });
-        } finally {
-          setIsLoading(false);
+// Update the PlayerMetricsDialog component
+const PlayerMetricsDialog = () => {
+  const [localMetrics, setLocalMetrics] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const dialogRef = useRef<{ hasLoaded: boolean }>({ hasLoaded: false });
+
+  useEffect(() => {
+    const loadMetrics = async () => {
+      if (!selectedPlayerForMetrics || dialogRef.current.hasLoaded) return;
+
+      setIsLoading(true);
+      try {
+        const session = sessions.find(s => s.id === selectedPlayerForMetrics.sessionId);
+        if (!session) {
+          console.error('Session not found for metrics dialog');
+          return;
         }
-      };
-  
-      loadMetrics();
-  
-      // Reset hasLoaded when dialog closes
-      return () => {
-        dialogRef.current.hasLoaded = false;
-      };
-    }, [selectedPlayerForMetrics, sessions, mongoPlayers]);
-  
-    const handleMetricChange = (key: string, value: number) => {
-      setLocalMetrics((prev: any) => ({
-        ...prev,
-        [key]: value.toString()
-      }));
+
+        // Fetch metrics from session's playerMetrics or fallback to player's original attributes
+        const playerMetrics = session.playerMetrics?.[selectedPlayerForMetrics.id];
+        const playerData = mongoPlayers.find(p => p.id === selectedPlayerForMetrics.id);
+
+        const metrics = {
+          shooting: playerMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
+          pace: playerMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
+          positioning: playerMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
+          passing: playerMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
+          ballControl: playerMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
+          crossing: playerMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
+          sessionRating: playerMetrics?.sessionRating?.toString() || "0",
+        };
+
+        setLocalMetrics(metrics);
+        dialogRef.current.hasLoaded = true;
+      } catch (error) {
+        console.error('Error loading metrics:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load player metrics",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
-  
-    return (
-      <Dialog 
-        open={!!selectedPlayerForMetrics} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedPlayerForMetrics(null);
-            setLocalMetrics(null);
-            dialogRef.current.hasLoaded = false;
-          }
-        }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Input Metrics for {selectedPlayerForMetrics?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Update performance metrics and session rating
-            </DialogDescription>
-          </DialogHeader>
+
+    loadMetrics();
+
+    // Reset hasLoaded when dialog closes
+    return () => {
+      dialogRef.current.hasLoaded = false;
+    };
+  }, [selectedPlayerForMetrics, sessions, mongoPlayers]);
+
+  const handleMetricChange = (key: string, value: number) => {
+    setLocalMetrics((prev: any) => ({
+      ...prev,
+      [key]: value.toString()
+    }));
+  };
+
+  const handleSaveAndClose = async () => {
+    if (!selectedPlayerForMetrics || !localMetrics) return;
+
+    const success = await handleSaveMetrics(
+      selectedPlayerForMetrics.sessionId,
+      selectedPlayerForMetrics.id,
+      localMetrics
+    );
+
+    if (success) {
+      setSelectedPlayerForMetrics(null);
+      setLocalMetrics(null);
+    }
+  };
+
+  return (
+    <Dialog 
+      open={!!selectedPlayerForMetrics} 
+      onOpenChange={(open) => {
+        if (!open) {
+          setSelectedPlayerForMetrics(null);
+          setLocalMetrics(null);
+          dialogRef.current.hasLoaded = false;
+        }
+      }}
+    >
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            Input Metrics for {selectedPlayerForMetrics?.name}
+          </DialogTitle>
           <DialogDescription>
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              {localMetrics && METRICS_CONFIG.map(({ key, label }) => (
-                <div key={key} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm">{label}</Label>
-                    <span className="text-sm text-muted-foreground">
-                      {localMetrics[key as keyof typeof localMetrics]}/10
-                    </span>
-                  </div>
-                  <Slider
-                    value={[Number(localMetrics[key as keyof typeof localMetrics])]}
-                    min={0}
-                    max={10}
-                    step={0.1}
-                    onValueChange={([value]) => handleMetricChange(key, value)}
-                  />
-                </div>
-              ))}
-              <div className="col-span-2 space-y-2">
+            Update performance metrics and session rating
+          </DialogDescription>
+        </DialogHeader>
+        <DialogDescription>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {localMetrics && METRICS_CONFIG.map(({ key, label }) => (
+              <div key={key} className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <Label className="text-sm">Session Rating</Label>
+                  <Label className="text-sm">{label}</Label>
                   <span className="text-sm text-muted-foreground">
-                    {localMetrics?.sessionRating}/10
+                    {localMetrics[key as keyof typeof localMetrics]}/10
                   </span>
                 </div>
                 <Slider
-                  value={[Number(localMetrics?.sessionRating)]}
+                  value={[Number(localMetrics[key as keyof typeof localMetrics])]}
                   min={0}
                   max={10}
                   step={0.1}
-                  onValueChange={([value]) => handleMetricChange('sessionRating', value)}
+                  onValueChange={([value]) => handleMetricChange(key, value)}
                 />
               </div>
+            ))}
+            <div className="col-span-2 space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm">Session Rating</Label>
+                <span className="text-sm text-muted-foreground">
+                  {localMetrics?.sessionRating}/10
+                </span>
+              </div>
+              <Slider
+                value={[Number(localMetrics?.sessionRating)]}
+                min={0}
+                max={10}
+                step={0.1}
+                onValueChange={([value]) => handleMetricChange('sessionRating', value)}
+              />
             </div>
-          </DialogDescription>
-          <DialogFooter className="mt-4">
-            <Button onClick={() => {
-              if (
-                selectedPlayerForMetrics &&
-                typeof selectedPlayerForMetrics.sessionId === "number" &&
-                selectedPlayerForMetrics.id
-              ) {
-                handleSaveMetrics(
-                  selectedPlayerForMetrics.sessionId,
-                  selectedPlayerForMetrics.id,
-                  localMetrics
-                );
-                setSelectedPlayerForMetrics(null);
-              }
-            }}>
-              Save Metrics
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
+          </div>
+        </DialogDescription>
+        <DialogFooter className="mt-4">
+          <Button onClick={handleSaveAndClose}>
+            Save Metrics
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
   // Add this new function
   const handleSelectAllPlayers = (checked: boolean) => {
@@ -2786,7 +2815,10 @@ const handleViewUpcomingOccurrences = async (parentId: number) => {
     const now = new Date();
     const upcomingOccurrences = allOccurrences
       .map((occurrence: Session) => {
+        // Adjust the date to handle timezone offset
         const occurrenceDate = new Date(occurrence.date);
+        occurrenceDate.setDate(occurrenceDate.getDate() + 1);  // Remove +1 adjustment
+        
         const [startHour, startMinute] = occurrence.startTime.split(':').map(Number);
         const sessionStart = new Date(occurrenceDate);
         sessionStart.setHours(startHour, startMinute, 0);
@@ -2795,6 +2827,7 @@ const handleViewUpcomingOccurrences = async (parentId: number) => {
         if (now < sessionStart) {
           return {
             ...occurrence,
+            date: occurrenceDate.toISOString().split('T')[0], // Use adjusted date
             status: "Upcoming" as const
           };
         }

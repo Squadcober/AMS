@@ -2428,52 +2428,52 @@ const handleConfirmExport = async () => {
     setVisibleSessionsCount(10)
   }, [activeLog, searchTerm])
 
-  const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
-    const cacheKey = `${playerId}-${sessionId}`;
-    const now = Date.now();
-  
-    // Return cached data if available and not expired
-    if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) { // 5 minutes
-      return metricsCache[cacheKey].data;
-    }
-  
-    try {
-      // First try to get session-specific metrics
-      const session = sessions.find(s => s.id === sessionId);
-      const sessionMetrics = session?.playerMetrics?.[playerId];
-  
-      // Get player's current attributes from MongoDB
-      const response = await fetch(`/api/db/ams-player-data/${playerId}`);
-      if (!response.ok) throw new Error('Failed to fetch player data');
-      const playerData = await response.json();
-  
-      const metrics = {
-        shooting: sessionMetrics?.shooting?.toString() || playerData?.attributes?.shooting?.toString() || "0",
-        pace: sessionMetrics?.pace?.toString() || playerData?.attributes?.pace?.toString() || "0",
-        positioning: sessionMetrics?.positioning?.toString() || playerData?.attributes?.positioning?.toString() || "0",
-        passing: sessionMetrics?.passing?.toString() || playerData?.attributes?.passing?.toString() || "0",
-        ballControl: sessionMetrics?.ballControl?.toString() || playerData?.attributes?.ballControl?.toString() || "0",
-        crossing: sessionMetrics?.crossing?.toString() || playerData?.attributes?.crossing?.toString() || "0",
-        sessionRating: sessionMetrics?.sessionRating?.toString() || "0"
-      };
-  
-      // Cache the metrics
-      metricsCache[cacheKey] = {
-        data: metrics,
-        timestamp: now,
-        isDirty: false
-      };
-  
-      return metrics;
-    } catch (error) {
-      console.error('Error getting player metrics:', error);
-      return metricsCache[cacheKey]?.data || {
-        shooting: "0", pace: "0", positioning: "0",
-        passing: "0", ballControl: "0", crossing: "0",
-        sessionRating: "0"
-      };
-    }
-  };
+const getPlayerCurrentMetrics = async (playerId: string, sessionId: number, sessions: Session[]) => {
+  const cacheKey = `${playerId}-${sessionId}`;
+  const now = Date.now();
+
+  // Return cached data if available and not expired
+  if (metricsCache[cacheKey] && now - metricsCache[cacheKey].timestamp < 300000) {
+    return metricsCache[cacheKey].data;
+  }
+
+  try {
+    // First try to get session-specific metrics
+    const session = sessions.find(s => s.id === sessionId);
+    const sessionMetrics = session?.playerMetrics?.[playerId];
+
+    // Get player's current metrics from MongoDB
+    const response = await fetch(`/api/db/ams-player-data/${playerId}/metrics`);
+    if (!response.ok) throw new Error('Failed to fetch player data');
+    const playerData = await response.json();
+
+    const metrics = {
+      shooting: sessionMetrics?.shooting?.toString() || playerData?.data?.attributes?.shooting?.toString() || "0",
+      pace: sessionMetrics?.pace?.toString() || playerData?.data?.attributes?.pace?.toString() || "0",
+      positioning: sessionMetrics?.positioning?.toString() || playerData?.data?.attributes?.positioning?.toString() || "0",
+      passing: sessionMetrics?.passing?.toString() || playerData?.data?.attributes?.passing?.toString() || "0",
+      ballControl: sessionMetrics?.ballControl?.toString() || playerData?.data?.attributes?.ballControl?.toString() || "0",
+      crossing: sessionMetrics?.crossing?.toString() || playerData?.data?.attributes?.crossing?.toString() || "0",
+      sessionRating: sessionMetrics?.sessionRating?.toString() || "0"
+    };
+
+    // Cache the metrics
+    metricsCache[cacheKey] = {
+      data: metrics,
+      timestamp: now,
+      isDirty: false
+    };
+
+    return metrics;
+  } catch (error) {
+    console.error('Error getting player metrics:', error);
+    return metricsCache[cacheKey]?.data || {
+      shooting: "0", pace: "0", positioning: "0",
+      passing: "0", ballControl: "0", crossing: "0",
+      sessionRating: "0"
+    };
+  }
+};
   
   const handleMetricsClick = async (playerId: string, playerName: string, sessionId: number) => {
     try {

@@ -1,21 +1,19 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientPromise } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { 
-      playerId, 
-      sessionId, 
-      attributes, 
-      sessionRating, 
+    const {
+      playerId,
+      sessionId,
+      attributes,
+      sessionRating,
       overall,
       type,
       date,
-      academyId 
-    } = body;
+      academyId
+    } = await request.json();
 
     if (!playerId || !sessionId || !attributes || !academyId) {
       return NextResponse.json({
@@ -27,57 +25,85 @@ export async function PATCH(request: NextRequest) {
     const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
-    // Create the performance history entry
-    const performanceEntry = {
-      date: new Date(date),
-      sessionId,
-      attributes,
-      sessionRating,
-      overall,
-      type,
-      updatedAt: new Date(),
-    };
-
-    // Update player document with new attributes and add to performance history
-    const result = await db.collection('ams-player-data').updateOne(
+    // Update the session metrics first
+    const sessionResult = await db.collection('ams-sessions').updateOne(
       { 
-        id: new ObjectId(playerId),
-        academyId // Ensure we're updating the correct academy's player
+        _id: new ObjectId(sessionId),
+        academyId: academyId 
       },
       {
         $set: {
-          attributes, // Update current attributes
-          overallRating: overall,
-          lastUpdated: new Date()
-        },
-        $push: {
-          'performanceHistory': { $each: [performanceEntry] }
-        }as any,
+          [`playerMetrics.${playerId}`]: {
+            ...attributes,
+            sessionRating,
+            overall,
+            updatedAt: new Date()
+          }
+        }
       }
     );
 
-    if (!result.matchedCount) {
+    // Update player's performance metrics and add to history
+    const playerResult = await db.collection('ams-player-data').updateOne(
+      { _id: new ObjectId(playerId) },
+      {
+        $set: {
+          attributes,
+          lastUpdated: new Date()
+        },
+        $push: {
+          'performanceHistory': {
+            $each: [{
+              date: new Date(date),
+              sessionId: sessionId,
+              attributes,
+              sessionRating,
+              overall,
+              type: type || 'training'
+            }]
+          }
+        }as any
+      }
+    );
+
+    if (!sessionResult.matchedCount || !playerResult.matchedCount) {
       return NextResponse.json({
         success: false,
-        error: 'Player not found'
+        error: 'Session or player not found'
       }, { status: 404 });
     }
 
-    // Get the updated player document
-    const updatedPlayer = await db.collection('ams-player-data').findOne({
-      id: new ObjectId(playerId)
+    // Also update parent session if this is an occurrence
+    const session = await db.collection('ams-sessions').findOne({ 
+      _id: new ObjectId(sessionId) 
     });
+
+    if (session?.parentSessionId) {
+      await db.collection('ams-sessions').updateOne(
+        { _id: new ObjectId(session.parentSessionId) },
+        {
+          $set: {
+            [`playerMetrics.${playerId}`]: {
+              ...attributes,
+              sessionRating,
+              overall,
+              updatedAt: new Date()
+            }
+          }
+        }
+      );
+    }
 
     return NextResponse.json({ 
       success: true,
-      data: updatedPlayer
+      message: 'Metrics updated successfully'
     });
 
   } catch (error) {
-    console.error('Error updating player metrics:', error);
+    console.error('Error updating session metrics:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to update player metrics'
+      error: 'Failed to update metrics'
     }, { status: 500 });
   }
 }

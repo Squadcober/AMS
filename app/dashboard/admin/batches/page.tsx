@@ -322,7 +322,7 @@ export default function BatchesPage() {
       if (result.success) {
         setBatchPlayers(prev => ({
           ...prev,
-          [batchId]: [...(prev[batchId] || []), ...players.filter(p => selectedPlayers.includes(p._id))]
+          [batchId]: [...(prev[batchId] || []), ...players.filter(p => selectedPlayers.includes(p.id))]
         }));
         setSelectedPlayers([]);
         toast({
@@ -622,8 +622,8 @@ export default function BatchesPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchPlayers[selectedBatch._id]?.map((player: any) => (
-                          <TableRow key={player._id}>
+                        {batchPlayers[selectedBatch.id]?.map((player: any) => (
+                          <TableRow key={player.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
@@ -638,7 +638,7 @@ export default function BatchesPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleViewPlayerDetails(player._id)}
+                                onClick={() => handleViewPlayerDetails(player.id)}
                               >
                                 View Details
                               </Button>
@@ -706,14 +706,14 @@ export default function BatchesPage() {
                 <Label>Players</Label>
                 <ScrollArea className="h-[200px] border rounded-md p-4">
                   {players.map((player) => (
-                    <div key={player._id} className="flex items-center space-x-2 py-2">
+                    <div key={player.id} className="flex items-center space-x-2 py-2">
                       <Checkbox
-                        checked={selectedPlayers.includes(player._id)}
+                        checked={selectedPlayers.includes(player.id)}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedPlayers(prev => [...prev, player._id]);
+                            setSelectedPlayers(prev => [...prev, player.id]);
                           } else {
-                            setSelectedPlayers(prev => prev.filter(id => id !== player._id));
+                            setSelectedPlayers(prev => prev.filter(id => id !== player.id));
                           }
                         }}
                       />

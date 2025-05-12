@@ -39,10 +39,12 @@ export async function GET(request: NextRequest) {
 
     console.log(`Found ${players.length} players for IDs:`, playerIds);
 
+    // Always include both _id and id in the response for robust client-side matching
     return NextResponse.json({
       success: true,
       data: players.map(player => ({
-        id: player._id?.toString() || player.id || player.playerId,
+        _id: player._id?.toString(),
+        id: player.id || "",
         name: player.name || player.username || 'Unknown Player',
         position: player.position || 'Unassigned',
         photoUrl: player.photoUrl || '/default-avatar.png',

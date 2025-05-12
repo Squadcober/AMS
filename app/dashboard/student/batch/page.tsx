@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Star } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 export default function StudentBatches() {
   const { user } = useAuth();
@@ -26,6 +27,8 @@ export default function StudentBatches() {
   const [ratings, setRatings] = useState<{[key: string]: number}>({});
   const [showCoachProfile, setShowCoachProfile] = useState(false);
   const [studentsInfo, setStudentsInfo] = useState<{[key: string]: any}>({});
+  const [allBatches, setAllBatches] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<"my" | "all">("my");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,22 +50,28 @@ export default function StudentBatches() {
 
         setCurrentPlayer(currentPlayer);
 
-        const playerObjectId = currentPlayer._id;
-        const playerId = currentPlayer.id;
+        // Use only the MongoDB _id string for batch player matching
+        const playerObjectId = currentPlayer._id?.toString();
 
-        const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user.academyId}&playerId=${playerId}&playerObjectId=${playerObjectId}`);
+        // Fetch all batches for this academy (do not filter by playerId in the API call)
+        const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
         if (!batchesResponse.ok) throw new Error('Failed to fetch batches');
         const batchesData = await batchesResponse.json();
-        
-        const playerBatches = batchesData.data.filter((batch: any) => 
-          batch.players?.some((pid: string) => 
-            pid === playerId || 
-            pid === playerObjectId ||
-            pid === currentPlayer._id.toString()
+
+        // Only match by MongoDB _id string
+        const playerBatches = batchesData.data.filter((batch: any) =>
+          Array.isArray(batch.players) &&
+          batch.players.some((pid: any) =>
+            pid !== undefined &&
+            pid !== null &&
+            playerObjectId && pid.toString() === playerObjectId
           )
         );
-        
+
         setBatches(playerBatches);
+
+        // Save all batches for "All Batches" view
+        setAllBatches(batchesData.data);
 
         const coachIds = new Set<string>();
         playerBatches.forEach((batch: { coachId?: string; coachIds?: string[]; userId?: string }) => {
@@ -225,7 +234,12 @@ export default function StudentBatches() {
   });
 
   const getPlayerData = (playerId: string) => {
-    const player = players.find(p => p.id.toString() === playerId.toString());
+    // Try to match by _id first, fallback to id if not found
+    const player = players.find(
+      p =>
+        (p._id && p._id.toString() === playerId.toString()) ||
+        (p.id && p.id.toString() === playerId.toString())
+    );
     return {
       name: player?.name || "Unknown Player",
       photoUrl: player?.photoUrl || "/placeholder.svg",
@@ -234,17 +248,20 @@ export default function StudentBatches() {
   };
 
   const getPlayersSummary = (playerIds: any[]) => {
-    const stringPlayerIds = playerIds.map(id => id.toString());
-    const matchingPlayers = players.filter(player => 
-      stringPlayerIds.includes(player.id.toString())
+    const stringPlayerIds = playerIds.map(id => id?.toString());
+    // Try to match by _id first, fallback to id if not found
+    const matchingPlayers = players.filter(
+      player =>
+        (player._id && stringPlayerIds.includes(player._id.toString())) ||
+        (player.id && stringPlayerIds.includes(player.id.toString()))
     );
-    
+
     const totalInBatch = stringPlayerIds.length;
     const matchingCount = matchingPlayers.length;
-    
+
     if (matchingCount === 0) return "No active players";
     if (matchingCount === 1) return `${matchingPlayers[0].name} (1/${totalInBatch} active)`;
-    
+
     return `${matchingPlayers[0].name} + ${matchingCount - 1} others (${matchingCount}/${totalInBatch} active)`;
   };
 
@@ -375,15 +392,29 @@ export default function StudentBatches() {
   const getCoachInfo = (coachId: string, batch?: any, idx?: number) => {
     const coach = coachData[coachId];
     if (coach && coach.name && coach.name !== "Unknown Coach") {
-      return coach;
-    }
-    if (batch && Array.isArray(batch.coachNames) && typeof idx === "number" && batch.coachNames[idx]) {
       return {
         id: coachId,
-        name: batch.coachNames[idx],
-        photoUrl: "/placeholder.svg",
-        email: "Not available"
+        name: coach.name,
+        photoUrl: coach.photoUrl || "/placeholder.svg",
+        email: coach.email || "Not available"
       };
+    }
+    // Try batch.coachNames and batch.coachPhotos for fallback
+    if (batch) {
+      let name = "Unknown Coach";
+      let photoUrl = "/placeholder.svg";
+      let email = "Not available";
+      if (Array.isArray(batch.coachNames) && typeof idx === "number" && batch.coachNames[idx]) {
+        name = batch.coachNames[idx];
+      } else if (batch.coachName) {
+        name = batch.coachName;
+      }
+      if (Array.isArray(batch.coachPhotos) && typeof idx === "number" && batch.coachPhotos[idx]) {
+        photoUrl = batch.coachPhotos[idx];
+      } else if (batch.coachPhotoUrl) {
+        photoUrl = batch.coachPhotoUrl;
+      }
+      return { id: coachId, name, photoUrl, email };
     }
     return {
       id: coachId,
@@ -393,12 +424,59 @@ export default function StudentBatches() {
     };
   };
 
+  const getCoachDisplayName = (batch: any, idx?: number) => {
+    if (batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0) {
+      const coachId = batch.coachIds[idx ?? 0];
+      const coach = coachData[coachId];
+      if (coach && coach.name) return coach.name;
+      if (batch.coachNames && batch.coachNames[idx ?? 0]) return batch.coachNames[idx ?? 0];
+    }
+    if (batch.coachId) {
+      const coach = coachData[batch.coachId];
+      if (coach && coach.name) return coach.name;
+      if (batch.coachName) return batch.coachName;
+    }
+    return "Unknown Coach";
+  };
+
+  const getCoachPhotoUrl = (batch: any, idx?: number) => {
+    // Use getCoachInfo to get the resolved coach object (with photoUrl)
+    if (batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0) {
+      const coachId = batch.coachIds[idx ?? 0];
+      const coach = getCoachInfo(coachId, batch, idx);
+      if (coach && coach.photoUrl && coach.photoUrl !== "/placeholder.svg" && coach.photoUrl !== "/default-avatar.png") return coach.photoUrl;
+    }
+    if (batch.coachId) {
+      const coach = getCoachInfo(batch.coachId, batch);
+      if (coach && coach.photoUrl && coach.photoUrl !== "/placeholder.svg" && coach.photoUrl !== "/default-avatar.png") return coach.photoUrl;
+    }
+    return "/placeholder.svg";
+  };
+
+  const getStudentCount = (batch: any) => {
+    if (Array.isArray(batch.players)) return batch.players.length;
+    return 0;
+  };
+
   return (
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 p-8 overflow-y-auto">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-white">My Batches</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold text-white">Batches</h1>
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={val => setViewMode(val as "my" | "all")}
+            className="bg-muted rounded"
+          >
+            <ToggleGroupItem value="my" aria-label="My Batches">
+              My Batches
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" aria-label="All Batches">
+              All Batches
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         <Table className="mt-6 cursor-pointer">
@@ -410,7 +488,7 @@ export default function StudentBatches() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {batches.map((batch) => (
+            {(viewMode === "my" ? batches : allBatches).map((batch) => (
               <TableRow 
                 key={batch.id} 
                 onClick={() => setSelectedBatch(batch)}
@@ -420,51 +498,45 @@ export default function StudentBatches() {
                 <TableCell>
                   {batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {batch.coachIds.map((coachId: string, idx: number) => {
-                        const coach = getCoachInfo(coachId, batch, idx);
-                        return (
-                          <div
-                            key={coachId}
-                            className="flex items-center gap-1 cursor-pointer"
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleCoachClick(coachId, e);
-                            }}
-                          >
-                            <Avatar className="h-6 w-6">
-                              <AvatarImage src={coach.photoUrl} alt={coach.name} />
-                              <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs underline text-white hover:text-gray-300">{coach.name}</span>
-                          </div>
-                        );
-                      })}
+                      {batch.coachIds.map((coachId: string, idx: number) => (
+                        <div
+                          key={coachId}
+                          className="flex items-center gap-1"
+                        >
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={getCoachPhotoUrl(batch, idx)} alt={getCoachDisplayName(batch, idx)} />
+                            <AvatarFallback>{getCoachDisplayName(batch, idx)?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs underline text-white hover:text-gray-300">
+                            {getCoachDisplayName(batch, idx)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     batch.coachId && (
-                      <div
-                        className="flex items-center gap-1 cursor-pointer"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleCoachClick(batch.coachId, e);
-                        }}
-                      >
+                      <div className="flex items-center gap-1">
                         <Avatar className="h-6 w-6">
-                          <AvatarImage src={getCoachInfo(batch.coachId, batch).photoUrl} alt={getCoachInfo(batch.coachId, batch).name} />
-                          <AvatarFallback>{getCoachInfo(batch.coachId, batch).name?.[0]}</AvatarFallback>
+                          <AvatarImage src={getCoachPhotoUrl(batch)} alt={getCoachDisplayName(batch)} />
+                          <AvatarFallback>{getCoachDisplayName(batch)?.[0]}</AvatarFallback>
                         </Avatar>
-                        <span className="text-xs underline text-white hover:text-gray-300">{getCoachInfo(batch.coachId, batch).name}</span>
+                        <span className="text-xs underline text-white hover:text-gray-300">
+                          {getCoachDisplayName(batch)}
+                        </span>
                       </div>
                     )
                   )}
                 </TableCell>
                 <TableCell>
-                  <span title={players
-                    .filter(p => batch.players.includes(p.id.toString()))
-                    .map(p => p.name)
-                    .join(", ")}>
-                    {getPlayersSummary(batch.players)}
-                  </span>
+                  {viewMode === "my"
+                    ? <span title={players
+                        .filter(p => batch.players.includes(p._id?.toString()))
+                        .map(p => p.name)
+                        .join(", ")}>
+                        {getPlayersSummary(batch.players)}
+                      </span>
+                    : <span>{getStudentCount(batch)} student{getStudentCount(batch) !== 1 ? "s" : ""}</span>
+                  }
                 </TableCell>
               </TableRow>
             ))}
@@ -496,7 +568,7 @@ export default function StudentBatches() {
                               }}
                             >
                               <Avatar className="h-16 w-16">
-                                <AvatarImage src={coach.photoUrl} alt={coach.name} />
+                                <AvatarImage src={coach.photoUrl || "/placeholder.svg"} alt={coach.name} />
                                 <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
                               </Avatar>
                               <span className="font-medium underline text-white hover:text-gray-300">{coach.name}</span>
@@ -510,20 +582,25 @@ export default function StudentBatches() {
                     selectedBatch.coachId && (
                       <div>
                         <div className="font-semibold mb-2">Coach:</div>
-                        <div
-                          className="flex flex-col items-center gap-2 cursor-pointer"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleCoachClick(selectedBatch.coachId, e);
-                          }}
-                        >
-                          <Avatar className="h-16 w-16">
-                            <AvatarImage src={getCoachInfo(selectedBatch.coachId, selectedBatch).photoUrl} alt={getCoachInfo(selectedBatch.coachId, selectedBatch).name} />
-                            <AvatarFallback>{getCoachInfo(selectedBatch.coachId, selectedBatch).name?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium underline text-white hover:text-gray-300">{getCoachInfo(selectedBatch.coachId, selectedBatch).name}</span>
-                          <span className="text-xs text-gray-500">{getCoachInfo(selectedBatch.coachId, selectedBatch).email}</span>
-                        </div>
+                        {(() => {
+                          const coach = getCoachInfo(selectedBatch.coachId, selectedBatch);
+                          return (
+                            <div
+                              className="flex flex-col items-center gap-2 cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleCoachClick(selectedBatch.coachId, e);
+                              }}
+                            >
+                              <Avatar className="h-16 w-16">
+                                <AvatarImage src={coach.photoUrl || "/placeholder.svg"} alt={coach.name} />
+                                <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium underline text-white hover:text-gray-300">{coach.name}</span>
+                              <span className="text-xs text-gray-500">{coach.email}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )
                   )}

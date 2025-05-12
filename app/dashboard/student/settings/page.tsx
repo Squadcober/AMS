@@ -581,16 +581,12 @@ export default function StudentSettings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="primaryPhone" className="flex items-center gap-2">
-                  Primary Phone
-                  <span className="text-xs text-muted-foreground">(System-assigned)</span>
-                </Label>
+                <Label htmlFor="primaryPhone">Primary Phone</Label>
                 <Input
                   id="primaryPhone"
                   type="tel"
                   value={studentInfo.primaryPhone}
-                  readOnly
-                  className="bg-muted cursor-not-allowed"
+                  onChange={(e) => setStudentInfo(prev => ({ ...prev, primaryPhone: e.target.value }))}
                 />
               </div>
 

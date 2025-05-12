@@ -46,7 +46,7 @@ interface Match {
   startTime: string
   endTime: string
   extraTime?: number
-  status?: 'Not Started' | 'On-going' | 'Completed'
+  status?: 'Not Started' | 'On-going' | 'Completed' | 'Finished'
   playerStats?: { [playerId: string]: PlayerMatchStats }
   academyId: string
 }
@@ -921,7 +921,7 @@ export default function MatchDay() {
                 </TableCell>
                 <TableCell>{match.team2 || match.opponent}</TableCell>
                 <TableCell>
-                  {match.status === 'Completed' ? (
+                  {match.status === 'Completed' || match.status === 'Finished' || calculateMatchStatus(match) === 'Finished' ? (
                     match.team1Score === match.team2Score ? (
                       <Badge variant="secondary" className="bg-gray-500 text-white">
                         Match Tied

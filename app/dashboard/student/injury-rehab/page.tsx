@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { usePlayers } from "@/contexts/PlayerContext"
 import { useAuth } from "@/contexts/AuthContext"
 import Image from "next/image"
-import { Sidebar } from "@/components/Sidebar" // Import the Sidebar component
+import { Sidebar } from "@/components/Sidebar"
 import { useToast } from "@/components/ui/use-toast"
-import { FileText, Trash2 } from "lucide-react" // Add this import
+import { FileText, Trash2 } from "lucide-react"
 
 const STORAGE_KEY = 'student-injuries-data'
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -54,7 +54,7 @@ export default function InjuryRehab() {
     treatment: "",
     poc: "",
     status: "",
-    xrayImages: ["/placeholder.svg", "/placeholder.svg"],
+    xrayImages: ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
     prescription: "/placeholder.svg",
     otherDocs: []
   })
@@ -62,13 +62,12 @@ export default function InjuryRehab() {
   const [showPdfDialog, setShowPdfDialog] = useState(false)
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [selectedInjuryIndex, setSelectedInjuryIndex] = useState<number>(0);
 
-  // Load player data first
   useEffect(() => {
     const loadPlayerData = async () => {
       if (user?.username && user?.academyId) {
         try {
-          // First try to get the player ID
           const playerResponse = await fetch(
             `/api/db/ams-player-data?academyId=${user.academyId}`,
             { credentials: 'include' }
@@ -78,7 +77,6 @@ export default function InjuryRehab() {
 
           const playerResult = await playerResponse.json();
           if (playerResult.success && playerResult.data) {
-            // Find the player that matches the user's username
             const playerMatch = playerResult.data.find(
               (player: any) => player.username === user.username || player.userId === user.username
             );
@@ -111,7 +109,6 @@ export default function InjuryRehab() {
     loadPlayerData();
   }, [user?.username, user?.academyId]);
 
-  // Replace the localStorage effects with API calls
   useEffect(() => {
     const fetchInjuries = async () => {
       if (!user?.username || !user?.academyId) return;
@@ -145,7 +142,6 @@ export default function InjuryRehab() {
     }
   }, [user]);
 
-  // Update the image compression function
   const compressImage = async (base64String: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = document.createElement('img');
@@ -154,7 +150,6 @@ export default function InjuryRehab() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
         
-        // Calculate new dimensions while maintaining aspect ratio
         let width = img.width;
         let height = img.height;
         const maxDimension = 800;
@@ -176,7 +171,6 @@ export default function InjuryRehab() {
     });
   };
 
-  // Helper function to save injuries to localStorage
   const saveInjuriesToStorage = (injuries: Injury[]) => {
     if (!user?.id) return;
     
@@ -199,7 +193,6 @@ export default function InjuryRehab() {
         localStorage.setItem(STORAGE_KEY, dataToStore);
       } catch (e) {
         if (typeof e === "object" && e !== null && "name" in e && (e as any).name === 'QuotaExceededError') {
-          // If storage is full, keep only the most recent injury
           const mostRecentInjury = injuriesWithUser[injuriesWithUser.length - 1];
           localStorage.setItem(STORAGE_KEY, JSON.stringify([mostRecentInjury]));
           
@@ -263,7 +256,7 @@ export default function InjuryRehab() {
   
         const result = await response.json();
         if (result.success) {
-          await refreshInjuries(); // Add this function
+          await refreshInjuries();
           toast({
             title: "Success",
             description: "Image uploaded successfully"
@@ -281,7 +274,6 @@ export default function InjuryRehab() {
     input.click();
   };
   
-  // Add refreshInjuries function
   const refreshInjuries = async () => {
     if (!user?.username || !user?.academyId) return;
     
@@ -304,7 +296,19 @@ export default function InjuryRehab() {
   
   const handleEditInjury = (injury: Injury) => {
     setEditingInjury(injury)
-    setNewInjury(injury)
+    setNewInjury({
+      ...injury,
+      xrayImages: Array.isArray(injury.xrayImages)
+        ? [
+            injury.xrayImages[0] || "/placeholder.svg",
+            injury.xrayImages[1] || "/placeholder.svg",
+            injury.xrayImages[2] || "/placeholder.svg"
+          ]
+        : ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
+      prescription: injury.prescription || "/placeholder.svg",
+      otherDocs: injury.otherDocs || [],
+      pdfFiles: injury.pdfFiles || []
+    })
     setIsEditDialogOpen(true)
   }
 
@@ -316,14 +320,13 @@ export default function InjuryRehab() {
       treatment: "",
       poc: "",
       status: "",
-      xrayImages: ["/placeholder.svg", "/placeholder.svg"],
+      xrayImages: ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
       prescription: "/placeholder.svg",
       otherDocs: []
     })
     setIsEditDialogOpen(true)
   }
 
-  // Replace saveInjuriesToStorage with API call
   const saveInjury = async (injury: Partial<Injury>) => {
     try {
       const method = injury._id ? 'PUT' : 'POST';
@@ -331,7 +334,9 @@ export default function InjuryRehab() {
         ...injury,
         playerId: user?.username,
         academyId: user?.academyId,
-        xrayImages: injury.xrayImages || ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
+        xrayImages: injury.xrayImages && injury.xrayImages.length === 3
+          ? injury.xrayImages
+          : ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
         prescription: injury.prescription || "/placeholder.svg",
         pdfFiles: injury.pdfFiles || []
       };
@@ -358,7 +363,6 @@ export default function InjuryRehab() {
     }
   };
 
-  // Update handleSaveInjury
   const handleSaveInjury = async () => {
     try {
       if (!user?.username || !user?.academyId) return;
@@ -367,40 +371,49 @@ export default function InjuryRehab() {
         ...newInjury,
         _id: editingInjury?._id,
         playerId: user.username,
-        academyId: user.academyId
+        academyId: user.academyId,
+        xrayImages: newInjury.xrayImages && newInjury.xrayImages.length === 3
+          ? newInjury.xrayImages
+          : ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
+        prescription: newInjury.prescription || "/placeholder.svg",
+        pdfFiles: newInjury.pdfFiles || []
       };
 
-      await saveInjury(injuryToSave);
+      const result = await saveInjury(injuryToSave);
 
-      // Refresh injuries list
-      const response = await fetch(
-        `/api/db/ams-injury?playerId=${user.username}&academyId=${user.academyId}`,
-        { credentials: 'include' }
-      );
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setInjuries(result.data);
+      if (result) {
+        // Instead of just refreshing, update the injuries state directly for edit
+        if (editingInjury?._id) {
+          setInjuries(prev =>
+            prev.map(inj =>
+              inj._id === editingInjury._id
+                ? { ...inj, ...injuryToSave }
+                : inj
+            )
+          );
+        } else {
+          // For new injury, refresh from server (to get _id and server fields)
+          await refreshInjuries();
         }
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Success",
+          description: `Injury ${editingInjury ? "updated" : "added"} successfully`,
+        });
       }
-
-      setIsEditDialogOpen(false);
-      toast({
-        title: "Success",
-        description: `Injury ${editingInjury ? "updated" : "added"} successfully`,
-      });
     } catch (error) {
-      console.error('Error saving injury:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save injury",
-        variant: "destructive",
-      });
+      if (error && (error as any).message) {
+        console.error('Error saving injury:', error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to save injury",
+          variant: "destructive",
+        });
+      }
+      setIsEditDialogOpen(false);
     }
   };
 
-  // Add new function to handle PDF upload
   const handlePdfUpload = async () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -441,7 +454,6 @@ export default function InjuryRehab() {
   
         const result = await response.json();
         if (result.success) {
-          // Refresh the injuries list to get updated PDF files
           await refreshInjuries();
           
           toast({
@@ -461,7 +473,6 @@ export default function InjuryRehab() {
     input.click();
   };
 
-  // Update the PDF viewing function
   const handleViewPdf = (pdfUrl: string) => {
     if (!pdfUrl) {
       toast({
@@ -473,12 +484,10 @@ export default function InjuryRehab() {
     }
     
     if (!pdfUrl.startsWith('data:application/pdf;base64,')) {
-      // If it's not a base64 PDF, check if it's a URL
       if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
         window.open(pdfUrl, '_blank');
         return;
       }
-      // If it's base64 but missing the prefix, add it
       pdfUrl = `data:application/pdf;base64,${pdfUrl}`;
     }
     
@@ -486,17 +495,14 @@ export default function InjuryRehab() {
     setShowPdfViewer(true);
   };
 
-  // Add function to delete PDF
   const handleDeletePdf = (indexToDelete: number) => {
     setInjuries((prevInjuries) => {
       const newInjuries = [...prevInjuries];
       const injury = { ...newInjuries[0] };
       
-      // Remove the PDF at the specified index
       injury.pdfFiles = injury.pdfFiles?.filter((_, index) => index !== indexToDelete);
       newInjuries[0] = injury;
       
-      // Save to localStorage
       saveInjuriesToStorage(newInjuries);
       
       toast({
@@ -528,7 +534,6 @@ export default function InjuryRehab() {
 
       const result = await response.json();
       if (result.success) {
-        // Update local state based on type
         if (type === 'injury') {
           setInjuries(prev => prev.filter(i => i._id !== id));
         } else if (type === 'image') {
@@ -572,7 +577,32 @@ export default function InjuryRehab() {
     }
   };
 
-  // Update the loading state UI to be more informative
+  const deleteInjury = async (injuryId: string) => {
+    if (!injuryId) return;
+    try {
+      const response = await fetch(`/api/db/ams-injury?id=${injuryId}&type=injury`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete injury");
+      }
+      setInjuries(prev => prev.filter(i => i._id !== injuryId));
+      toast({
+        title: "Success",
+        description: "Injury deleted successfully"
+      });
+    } catch (error) {
+      console.error("Error deleting injury:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete injury",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen bg-background">
@@ -587,7 +617,6 @@ export default function InjuryRehab() {
     );
   }
 
-  // Update the no data state UI to be more helpful
   if (!playerData) {
     return (
       <div className="flex h-screen bg-background">
@@ -617,11 +646,10 @@ export default function InjuryRehab() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar /> {/* Add the Sidebar component here */}
+      <Sidebar />
       <div className="flex-1 flex flex-col space-y-6 overflow-auto">
         <div className="p-6 space-y-6 bg-black min-h-screen">
           <div className="flex justify-between items-start">
-           
             <div className="text-right">
               <h2 className="text-4xl font-bold text-white">{playerData.name}</h2>
               <p className="text-xl text-gray-400">Age : {playerData.age}</p>
@@ -658,13 +686,28 @@ export default function InjuryRehab() {
             </div>
           </div>
 
-          {/* Update PDF files display section */}
-          {injuries[0]?.pdfFiles && injuries[0].pdfFiles.length > 0 && (
+          {injuries.length > 1 && (
+            <div className="flex gap-2 mb-4">
+              {injuries.map((injury, idx) => (
+                <Button
+                  key={injury._id || injury.id || idx}
+                  variant={selectedInjuryIndex === idx ? "default" : "outline"}
+                  className={selectedInjuryIndex === idx ? "bg-[#85FFC4] text-black" : ""}
+                  onClick={() => setSelectedInjuryIndex(idx)}
+                  size="sm"
+                >
+                  {injury.type || `Injury ${idx + 1}`}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {injuries[selectedInjuryIndex]?.pdfFiles && injuries[selectedInjuryIndex].pdfFiles.length > 0 && (
             <Card className="bg-[#1a1f2b] border-none">
               <CardContent className="p-4">
                 <h3 className="text-white font-semibold mb-4">PDF Documents</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {injuries[0].pdfFiles.map((pdf, index) => (
+                  {injuries[selectedInjuryIndex].pdfFiles.map((pdf, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-2 bg-accent rounded-lg"
@@ -707,8 +750,13 @@ export default function InjuryRehab() {
                 </TableHeader>
                 <TableBody>
                   {injuries.map((injury, index) => (
-                    <TableRow key={injury.id || index}>
-                      <TableCell className="text-white">{injury.type}</TableCell>
+                    <TableRow key={injury.id || index} className={selectedInjuryIndex === index ? "bg-accent" : ""}>
+                      <TableCell
+                        className="text-white cursor-pointer underline"
+                        onClick={() => setSelectedInjuryIndex(index)}
+                      >
+                        {injury.type}
+                      </TableCell>
                       <TableCell className="text-white">{injury.date}</TableCell>
                       <TableCell className="text-white">{injury.treatment}</TableCell>
                       <TableCell className="text-white">{injury.poc}</TableCell>
@@ -721,7 +769,6 @@ export default function InjuryRehab() {
                         >
                           Edit
                         </Button>
-                        {/* View Certificate Button */}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -733,6 +780,13 @@ export default function InjuryRehab() {
                         >
                           View Certificate
                         </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteInjury(injury._id || injury.id)}
+                        >
+                          Delete
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -741,7 +795,6 @@ export default function InjuryRehab() {
             </CardContent>
           </Card>
 
-          {/* Add Edit/Create Dialog */}
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogContent>
               <DialogHeader>
@@ -811,14 +864,13 @@ export default function InjuryRehab() {
             </DialogContent>
           </Dialog>
 
-          {/* Update X-ray images grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             {[0, 1, 2].map((imageIndex) => (
               <Dialog key={imageIndex}>
                 <DialogTrigger asChild>
                   <div className="relative aspect-[4/3] w-full cursor-pointer group rounded-lg overflow-hidden">
                     <Image
-                      src={injuries[0]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
+                      src={injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
                       alt={`X-ray ${imageIndex + 1}`}
                       fill
                       style={{ objectFit: 'contain' }}
@@ -828,14 +880,14 @@ export default function InjuryRehab() {
                       <div className="flex gap-2">
                         <Button
                           className="bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80"
-                          onClick={() => handleImageUpload(0, "xray", imageIndex)}
+                          onClick={() => handleImageUpload(selectedInjuryIndex, "xray", imageIndex)}
                         >
                           Add
                         </Button>
-                        {injuries[0]?.xrayImages?.[imageIndex] !== '/placeholder.svg' && (
+                        {injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] !== '/placeholder.svg' && (
                           <Button
                             variant="destructive"
-                            onClick={() => handleDelete(injuries[0]._id ?? '', 'image', imageIndex)}
+                            onClick={() => handleDelete(injuries[selectedInjuryIndex]._id ?? '', 'image', imageIndex)}
                           >
                             Delete
                           </Button>
@@ -850,7 +902,7 @@ export default function InjuryRehab() {
                   </DialogHeader>
                   <div className="relative w-full h-[calc(90vh-8rem)]">
                     <Image
-                      src={injuries[0]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
+                      src={injuries[selectedInjuryIndex]?.xrayImages?.[imageIndex] || "/placeholder.svg"}
                       alt={`X-ray ${imageIndex + 1}`}
                       fill
                       style={{ objectFit: 'contain' }}
@@ -862,12 +914,11 @@ export default function InjuryRehab() {
             ))}
           </div>
 
-          {/* Update Prescription image */}
           <Dialog>
             <DialogTrigger asChild>
               <div className="relative aspect-[4/3] w-full max-w-2xl mx-auto cursor-pointer group rounded-lg overflow-hidden">
                 <Image
-                  src={injuries[0]?.prescription || "/placeholder.svg"}
+                  src={injuries[selectedInjuryIndex]?.prescription || "/placeholder.svg"}
                   alt="Prescription"
                   fill
                   style={{ objectFit: 'contain' }}
@@ -875,7 +926,7 @@ export default function InjuryRehab() {
                 />
                 <Button
                   className="absolute bottom-4 left-4 bg-[#85FFC4] text-black hover:bg-[#85FFC4]/80 z-10"
-                  onClick={() => handleImageUpload(0, "prescription")}
+                  onClick={() => handleImageUpload(selectedInjuryIndex, "prescription")}
                 >
                   ADD
                 </Button>
@@ -887,7 +938,7 @@ export default function InjuryRehab() {
               </DialogHeader>
               <div className="relative w-full h-[calc(90vh-8rem)]">
                 <Image
-                  src={injuries[0]?.prescription || "/placeholder.svg"}
+                  src={injuries[selectedInjuryIndex]?.prescription || "/placeholder.svg"}
                   alt="Prescription"
                   fill
                   style={{ objectFit: 'contain' }}
@@ -899,7 +950,6 @@ export default function InjuryRehab() {
         </div>
       </div>
 
-      {/* Update the PDF Dialog component */}
       <Dialog open={showPdfViewer} onOpenChange={setShowPdfViewer}>
         <DialogContent className="max-w-4xl w-full h-[90vh]">
           <DialogHeader>

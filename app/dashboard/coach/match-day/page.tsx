@@ -45,7 +45,7 @@ interface Match {
   startTime: string
   endTime: string
   extraTime?: number
-  status?: 'Not Started' | 'On-going' | 'Completed'
+  status?: 'Not Started' | 'On-going' | 'Completed' | 'Finished'
   playerStats?: { [playerId: string]: PlayerMatchStats }
   academyId: string
 }
@@ -859,21 +859,29 @@ export default function MatchDay() {
                 </TableCell>
                 <TableCell>{match.team2 || match.opponent}</TableCell>
                 <TableCell>
-                  {match.status === 'Completed' ? (
+                  {(match.status === 'Completed' || match.status === 'Finished') ? (
                     match.team1Score === match.team2Score ? (
-                      <Badge variant="secondary">Match Tied</Badge>
+                      <Badge variant="secondary" className="bg-gray-500 text-white">
+                        Match Tied
+                      </Badge>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="flex flex-col gap-2">
                         {match.winner && (
-                          <Badge variant="success">Winner: {match.winner}</Badge>
+                          <Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">
+                            Winner: {match.winner}
+                          </Badge>
                         )}
                         {match.loser && (
-                          <Badge variant="destructive">Loser: {match.loser}</Badge>
+                          <Badge variant="default" className="bg-red-600 text-white hover:bg-red-700">
+                            Loser: {match.loser}
+                          </Badge>
                         )}
                       </div>
                     )
                   ) : (
-                    <Badge variant="outline">{match.status || 'Upcoming'}</Badge>
+                    <Badge variant="outline" className="border-gray-400 text-gray-400">
+                      {match.status || 'Upcoming'}
+                    </Badge>
                   )}
                 </TableCell>
                 <TableCell>{match.startTime}</TableCell>

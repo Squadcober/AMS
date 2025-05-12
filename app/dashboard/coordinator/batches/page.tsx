@@ -249,6 +249,83 @@ export default function BatchesPage() {
     fetchCoaches();
   }, [user?.academyId]);
 
+  // Add a helper to fetch player details by ID
+  const fetchPlayerDetails = async (playerId: string) => {
+    try {
+      const response = await fetch(`/api/db/ams-player-data/batch/${playerId}`);
+      if (!response.ok) return null;
+      const result = await response.json();
+      if (result.success && result.data) {
+        return {
+          ...result.data,
+          name: result.data.name || result.data.username || "Unknown Player",
+          photoUrl: result.data.photoUrl || "/placeholder.svg",
+          position: result.data.position || "",
+        };
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  // Add a helper to fetch coach details by ID (including average rating)
+  const fetchCoachDetails = async (coachId: string) => {
+    try {
+      const userResponse = await fetch(`/api/db/ams-users/${coachId}`);
+      const userData = await userResponse.json();
+      const coachResponse = await fetch(`/api/db/coach-profile/${coachId}`);
+      const coachData = await coachResponse.json();
+
+      let averageRating = 0;
+      const ratings = coachData.data?.ratings || [];
+      if (ratings.length > 0) {
+        averageRating = ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length;
+      }
+
+      return {
+        id: coachId,
+        name: userData.data?.name || userData.data?.username || "Unknown Coach",
+        email: userData.data?.email,
+        photoUrl: userData.data?.photoUrl || coachData.data?.photoUrl || "/placeholder.svg",
+        averageRating: averageRating.toFixed(1),
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  // When batchPlayers or batchCoaches are set, fetch and update their details
+  useEffect(() => {
+    const updateBatchPlayersDetails = async () => {
+      if (!selectedBatch?._id || !batchPlayers[selectedBatch._id]) return;
+      const updatedPlayers = await Promise.all(
+        batchPlayers[selectedBatch._id].map(async (player: any) => {
+          if (player.name && player.photoUrl && player.position) return player;
+          const details = await fetchPlayerDetails(player._id || player.id);
+          return { ...player, ...details };
+        })
+      );
+      setBatchPlayers(prev => ({ ...prev, [selectedBatch._id]: updatedPlayers }));
+    };
+    updateBatchPlayersDetails();
+  }, [selectedBatch, batchPlayers[selectedBatch?._id]?.length]);
+
+  useEffect(() => {
+    const updateBatchCoachesDetails = async () => {
+      if (!selectedBatch?._id || !batchCoaches[selectedBatch._id]) return;
+      const updatedCoaches = await Promise.all(
+        batchCoaches[selectedBatch._id].map(async (coach: any) => {
+          if (coach.name && coach.photoUrl && coach.averageRating) return coach;
+          const details = await fetchCoachDetails(coach.id);
+          return { ...coach, ...details };
+        })
+      );
+      setBatchCoaches(prev => ({ ...prev, [selectedBatch._id]: updatedCoaches }));
+    };
+    updateBatchCoachesDetails();
+  }, [selectedBatch, batchCoaches[selectedBatch?._id]?.length]);
+
   const handleDeleteBatch = async (batchId: string) => {
     try {
       if (!window.confirm("Are you sure you want to permanently delete this batch? This action cannot be undone.")) {
@@ -308,37 +385,6 @@ export default function BatchesPage() {
     }
   };
 
-  const handleAddPlayers = async (batchId: string) => {
-    try {
-      const response = await fetch(`/api/db/ams-batches/${batchId}/players`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ players: selectedPlayers })
-      });
-
-      if (!response.ok) throw new Error("Failed to add players to batch");
-
-      const result = await response.json();
-      if (result.success) {
-        setBatchPlayers(prev => ({
-          ...prev,
-          [batchId]: [...(prev[batchId] || []), ...players.filter(p => selectedPlayers.includes(p._id))]
-        }));
-        setSelectedPlayers([]);
-        toast({
-          title: "Success",
-          description: "Players added successfully",
-        });
-      }
-    } catch (error) {
-      console.error("Error adding players:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add players",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleCreateBatch = async () => {
     try {
@@ -555,7 +601,11 @@ export default function BatchesPage() {
                         </Button>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2">
-                        Coach: {batch.coachName}
+                        Coach: {
+                          Array.isArray(batch.coachNames) && batch.coachNames.length > 0
+                            ? batch.coachNames.join(", ")
+                            : (batch.coachName || "Not available")
+                        }
                       </p>
                     </div>
                   ))}
@@ -580,22 +630,34 @@ export default function BatchesPage() {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Email</TableHead>
+                          <TableHead>Rating</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchCoaches[selectedBatch._id]?.map((coach: any) => (
+                        {batchCoaches[selectedBatch._id]?.length > 0 ? batchCoaches[selectedBatch._id].map((coach: any) => (
                           <TableRow key={coach.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage src={coach.photoUrl} />
-                                  <AvatarFallback>{coach.name?.[0]}</AvatarFallback>
+                                  <AvatarFallback>{coach.name?.[0] || "N"}</AvatarFallback>
                                 </Avatar>
-                                {coach.name}
+                                {coach.name || "Not available"}
                               </div>
                             </TableCell>
-                            <TableCell>{coach.email}</TableCell>
+                            <TableCell>{coach.email || "Not available"}</TableCell>
+                            <TableCell>
+                              {/* Show stars for averageRating */}
+                              <div className="flex items-center">
+                                <span className="font-bold mr-1">{coach.averageRating || "N/A"}</span>
+                                <span className="text-yellow-400">
+                                  {coach.averageRating && !isNaN(Number(coach.averageRating))
+                                    ? "★".repeat(Math.round(Number(coach.averageRating)))
+                                    : ""}
+                                </span>
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
@@ -606,7 +668,13 @@ export default function BatchesPage() {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              Not available
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -616,24 +684,23 @@ export default function BatchesPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>Photo</TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Position</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {batchPlayers[selectedBatch._id]?.map((player: any) => (
+                        {batchPlayers[selectedBatch._id]?.length > 0 ? batchPlayers[selectedBatch._id].map((player: any) => (
                           <TableRow key={player._id}>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={player.photoUrl} />
-                                  <AvatarFallback>{player.name[0]}</AvatarFallback>
-                                </Avatar>
-                                {player.name}
-                              </div>
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={player.photoUrl || "/placeholder.svg"} />
+                                <AvatarFallback>{player.name?.[0] || "U"}</AvatarFallback>
+                              </Avatar>
                             </TableCell>
-                            <TableCell>{player.position}</TableCell>
+                            <TableCell>{player.name || "Unknown Player"}</TableCell>
+                            <TableCell>{player.position || "No position"}</TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
@@ -644,7 +711,13 @@ export default function BatchesPage() {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No players in this batch
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>

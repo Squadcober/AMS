@@ -578,106 +578,97 @@ function SessionsContent() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   const [viewDetailsSessionData, setViewDetailsSessionData] = useState<Session | null>(null);
+
+  // Define fetchSessions function
+  const fetchSessions = useCallback(
+    async (forceRefresh: boolean = false) => {
+      if (!user?.academyId) {
+        return;
+      }
+      try {
+        const response = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch sessions');
+        }
+        const result = await response.json();
+        if (!Array.isArray(result.data)) {
+          console.warn('Invalid response format:', result);
+          return;
+        }
+        const updatedSessions = updateSessionStatus(result.data);
+        setSessions(updatedSessions);
+        setLastUpdate(Date.now());
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+        return;
+      }
+    },
+    [user?.academyId]
+  );
   
   // ...other state declarations...
 
   // Add this state near other state declarations, before OccurrencesDialog is used
   const [isOccurrencesDialogOpen, setIsOccurrencesDialogOpen] = useState(false);
 
-  // Update the fetchSessions function
-  const fetchSessions = useCallback(async (forceRefresh = false) => {
-    if (!user?.academyId) {
-      console.log('No academyId available');
-      return;
-    }
+  // Move mapSessionPlayers definition here, before the useEffect
+  // (Removed duplicate declaration to avoid redeclaration error)
 
-    try {
-      setIsLoading(true);
+  // Get players from context
+  const { players } = usePlayers();
 
-      console.log('Fetching sessions from API...');
-      const response = await fetch(
-        `/api/db/ams-sessions?academyId=${encodeURIComponent(user.academyId)}`,
-        {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }
-      );
+  // Define mapSessionPlayers before any useEffect that uses it
+  const mapSessionPlayers = useCallback((session: any) => ({
+    ...session,
+    assignedPlayers: session.assignedPlayers.map((playerId: string) => {
+      const player = players.find(p => p.id === playerId)
+      return playerId // Just return the ID since we've updated the type
+    })
+  }), [players]);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (!result.success || !Array.isArray(result.data)) {
-        throw new Error(result.error || 'Invalid session data format');
-      }
-
-      const sessionsData = result.data;
-
-      console.log('Fetched sessions:', sessionsData);
-
-      // Update state only if valid data is fetched
-      setSessions(prevSessions => {
-        if (Array.isArray(sessionsData) && sessionsData.length > 0) {
-          console.log('Updating sessions state with fetched data.');
-          return sessionsData;
-        }
-        console.log('No valid data fetched. Retaining previous state.');
-        return prevSessions;
-      });
-
-      setLastUpdate(Date.now());
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
-
-      // Show a toast notification for the error
-      toast({
-        title: "Error",
-        description: "Failed to fetch sessions. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.academyId, toast]);
-
-  // Initial load effect
+  // Replace the sessions loading useEffect
   useEffect(() => {
-    let mounted = true;
-    let retryTimeout: NodeJS.Timeout;
-
-    const loadInitialSessions = async () => {
+    const loadSessions = async () => {
       if (!user?.academyId) {
         console.log('Waiting for academyId...');
         return;
       }
-      
       try {
-        await fetchSessions();
-      } catch (error) {
-        if (mounted) {
-          console.error('Initial load failed:', error);
-          retryTimeout = setTimeout(() => {
-            if (mounted) {
-              loadInitialSessions();
-            }
-          }, 5000);
+        const response = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user?.academyId || '')}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch sessions');
         }
+        const result = await response.json();
+        if (!Array.isArray(result.data)) {
+          console.warn('Invalid response format:', result);
+          // Do NOT clear sessions on error, just return
+          return;
+        }
+        const updatedSessions = updateSessionStatus(result.data);
+        setSessions(updatedSessions);
+        setLastUpdate(Date.now());
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+        // Do NOT clear sessions on error, just return
+        return;
       }
     };
 
-    loadInitialSessions();
+    if (user?.academyId) {
+      loadSessions();
 
-    return () => {
-      mounted = false;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
-    };
-  }, [user?.academyId, fetchSessions]);
+      const pollInterval = setInterval(() => {
+        if (isPolling) {
+          loadSessions();
+        }
+      }, POLLING_INTERVAL);
+
+      return () => {
+        clearInterval(pollInterval);
+        setIsPolling(false);
+      };
+    }
+  }, [mapSessionPlayers, isPolling, user?.academyId]);
 
   // Polling effect - now isPolling is declared before use
   useEffect(() => {
@@ -726,7 +717,7 @@ function SessionsContent() {
     BackendSetup.initialize()
   }, [])
 
-  const { players } = usePlayers()
+  // const { players } = usePlayers()
   const { batches, setBatches } = useBatches()
   const { coaches, setCoaches } = useCoaches() // Fetch coaches from context
   const [newSession, setNewSession] = useState<Omit<Session, "id" | "status" | "playerRatings" | "attendance">>({
@@ -795,59 +786,7 @@ function SessionsContent() {
   ]
 
   // Move mapSessionPlayers outside useEffect and memoize it
-  const mapSessionPlayers = useCallback((session: any) => ({
-    ...session,
-    assignedPlayers: session.assignedPlayers.map((playerId: string) => {
-      const player = players.find(p => p.id === playerId)
-      return playerId // Just return the ID since we've updated the type
-    })
-  }), [players]);
-
-  // Replace the sessions loading useEffect
-  useEffect(() => {
-    const loadSessions = async () => {
-      if (!user?.academyId) {
-        console.log('Waiting for academyId...');
-        return;
-      }
-      try {
-        const response = await fetch(`/api/db/ams-sessions?academyId=${encodeURIComponent(user?.academyId || '')}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch sessions');
-        }
-        
-        const result = await response.json();
-        
-        if (!Array.isArray(result.data)) {
-          console.warn('Invalid response format:', result);
-          setSessions([]);
-          return;
-        }
-
-        const updatedSessions = updateSessionStatus(result.data);
-        setSessions(updatedSessions);
-        setLastUpdate(Date.now());
-      } catch (error) {
-        console.error('Error loading sessions:', error);
-        setSessions([]);
-      }
-    };
-
-    if (user?.academyId) {
-      loadSessions();
-
-      const pollInterval = setInterval(() => {
-        if (isPolling) {
-          loadSessions();
-        }
-      }, POLLING_INTERVAL);
-
-      return () => {
-        clearInterval(pollInterval);
-        setIsPolling(false);
-      };
-    }
-  }, [mapSessionPlayers, isPolling, user?.academyId]);
+  // (Removed duplicate declaration to avoid redeclaration error)
 
   // Update the chunked data loading effect
   useEffect(() => {
@@ -855,25 +794,27 @@ function SessionsContent() {
       try {
         const chunkCount = parseInt(localStorage.getItem(`${LOCAL_STORAGE_KEY}_count`) || "0");
         let allSessions: Session[] = [];
-        
         for (let i = 0; i < chunkCount; i++) {
           const chunk = StorageUtils.getItem(`${LOCAL_STORAGE_KEY}_${i}`);
           if (Array.isArray(chunk)) {
             allSessions = [...allSessions, ...chunk];
           }
         }
-
         return allSessions;
       } catch (error) {
         console.error('Error loading sessions:', error);
+        // Do NOT clear sessions on error, just return previous state
         return [];
       }
     };
 
     const savedSessions = loadSessions();
     const updatedSessions = updateSessionStatus(Array.isArray(savedSessions) ? savedSessions.map(mapSessionPlayers) : []);
-    setSessions(updatedSessions);
-  }, [mapSessionPlayers]); // Add mapSessionPlayers to dependencies
+    // Only update if we have valid data
+    if (Array.isArray(savedSessions) && savedSessions.length > 0) {
+      setSessions(updatedSessions);
+    }
+  }, [mapSessionPlayers]);
 
   useEffect(() => {
     const mapSessionPlayers = (session: any) => ({
@@ -888,18 +829,28 @@ function SessionsContent() {
     const savedSessions = StorageUtils.getItem(LOCAL_STORAGE_KEY) || [];
     const sessionsArray = Array.isArray(savedSessions) ? savedSessions : [];
     const updatedSessions = updateSessionStatus(sessionsArray.map(mapSessionPlayers));
-    setSessions(updatedSessions);
+    // Only update if we have valid data
+    if (sessionsArray.length > 0) {
+      setSessions(updatedSessions);
+    }
 
     const interval = setInterval(async () => {
       const updatedSessions = await updateSessionStatus(sessionsArray.map(mapSessionPlayers));
-      setSessions(updatedSessions.map(mapSessionPlayers));
+      // Only update if we have valid data
+      if (sessionsArray.length > 0) {
+        setSessions(updatedSessions.map(mapSessionPlayers));
+      }
     }, 60000);
     const updateSessions = async () => {
       try {
         const updatedSessions = await updateSessionStatus(sessionsArray.map(mapSessionPlayers));
-        setSessions(updatedSessions.map(mapSessionPlayers));
+        // Only update if we have valid data
+        if (sessionsArray.length > 0) {
+          setSessions(updatedSessions.map(mapSessionPlayers));
+        }
       } catch (error) {
         console.error('Error updating sessions:', error);
+        // Do NOT clear sessions on error
       }
     };
 
@@ -1307,7 +1258,7 @@ const handleRejectSession = async (sessionId: number) => {
   }
 }
 
-// Add this state near other state declarations
+// Add this state for occurrences
 const [occurrences, setOccurrences] = useState<Session[]>([]);
 
 // Update handleViewOccurrences function
@@ -1465,7 +1416,7 @@ const handleViewDetails = async (sessionId: number | string) => {
         const playersResult = await playersResponse.json();
         if (playersResult.success && Array.isArray(playersResult.data)) {
           session.assignedPlayersData = playersResult.data.map((player: any) => ({
-            id: player._id || player.id,
+            id: player.id || player.id,
             name: player.name || player.username || 'Unknown Player',
             position: player.position || 'Not specified',
             photoUrl: player.photoUrl || DEFAULT_AVATAR,
@@ -2321,11 +2272,11 @@ useEffect(() => {
         console.log('Fetched players data:', playersData);
 
         if (playersData.success && Array.isArray(playersData.data)) {
-          // Always assign all batch players to assignedPlayers (as strings)
+          // Always assign all batch players to assignedPlayers (as strings), using the `id` field that starts with player_
           setNewSession(prev => ({
             ...prev,
             assignedBatch: value,
-            assignedPlayers: playerIds.map((id: any) => id.toString()),
+            assignedPlayers: playersData.data.map((p: any) => p.id), // Use id, not _id
             assignedPlayersData: playersData.data,
             coachId: batchData.coachIds || [batchData.coachId],
             coachNames: batchData.coachNames || []
@@ -2406,29 +2357,6 @@ const handleConfirmExport = async () => {
     });
   }
 };
-
-  // Update the initial load effect to handle chunked data
-  useEffect(() => {
-    const loadSessions = () => {
-      try {
-        const chunkCount = parseInt(localStorage.getItem(`${LOCAL_STORAGE_KEY}_count`) || "0");
-        let allSessions: Session[] = [];
-        
-        for (let i = 0; i < chunkCount; i++) {
-          const chunk = StorageUtils.getItem(`${LOCAL_STORAGE_KEY}_${i}`);
-          if (Array.isArray(chunk)) allSessions = [...allSessions, ...chunk];
-        }
-
-        return allSessions;
-      } catch (error) {
-        console.error('Error loading sessions:', error);
-        return [];
-      }
-    };
-
-    const savedSessions = loadSessions();
-    setSessions(savedSessions.map(mapSessionPlayers));
-  }, []);
 
   // Reset visible count when changing tabs or search
   useEffect(() => {
@@ -2567,6 +2495,22 @@ const handleSaveMetrics = async (sessionId: number, playerId: string, metricsToS
       return session;
     }));
 
+    // Update the mongoPlayers state so dialog shows latest metrics immediately
+    setMongoPlayers(prevPlayers =>
+      prevPlayers.map(player =>
+        player.id === playerId
+          ? {
+              ...player,
+              attributes: {
+                ...player.attributes,
+                ...numericMetrics
+              },
+              lastUpdated: new Date().toISOString()
+            }
+          : player
+      )
+    );
+
     // If we have a view details session open, update it too
     if (viewDetailsSessionData && viewDetailsSessionData.id === sessionId) {
       setViewDetailsSessionData(prev => {
@@ -2701,7 +2645,7 @@ const PlayerMetricsDialog = () => {
             Update performance metrics and session rating
           </DialogDescription>
         </DialogHeader>
-        <DialogDescription>
+        <div>
           <div className="grid grid-cols-2 gap-4 mt-4">
             {localMetrics && METRICS_CONFIG.map(({ key, label }) => (
               <div key={key} className="space-y-2">
@@ -2736,7 +2680,7 @@ const PlayerMetricsDialog = () => {
               />
             </div>
           </div>
-        </DialogDescription>
+        </div>
         <DialogFooter className="mt-4">
           <Button onClick={handleSaveAndClose}>
             Save Metrics
@@ -3223,7 +3167,7 @@ const renderSessionDetails = (session: Session | undefined) => {
         if (result.success && Array.isArray(result.data)) {
           setMongoPlayers(result.data.map((player: any) => ({
             ...player,
-            id: player._id?.toString() || player.id,
+            id: player.id?.toString() || player.id,
             name: player.name || player.username || 'Unknown Player',
             academyId: player.academyId
           })));

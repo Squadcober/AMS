@@ -25,10 +25,10 @@ export async function PATCH(request: NextRequest) {
     const client = await getClientPromise();
     const db = client.db(process.env.MONGODB_DB);
 
-    // Update the session metrics first
-    const sessionResult = await db.collection('ams-sessions').updateOne(
+    // Try to update by _id (ObjectId), fallback to id (string)
+    let sessionResult = await db.collection('ams-sessions').updateOne(
       { 
-        _id: new ObjectId(sessionId),
+        _id: ObjectId.isValid(sessionId) ? new ObjectId(sessionId) : sessionId,
         academyId: academyId 
       },
       {
@@ -43,9 +43,29 @@ export async function PATCH(request: NextRequest) {
       }
     );
 
+    // If not matched, try by id (string)
+    if (!sessionResult.matchedCount) {
+      sessionResult = await db.collection('ams-sessions').updateOne(
+        { 
+          id: typeof sessionId === 'string' && !ObjectId.isValid(sessionId) ? sessionId : Number(sessionId),
+          academyId: academyId 
+        },
+        {
+          $set: {
+            [`playerMetrics.${playerId}`]: {
+              ...attributes,
+              sessionRating,
+              overall,
+              updatedAt: new Date()
+            }
+          }
+        }
+      );
+    }
+
     // Update player's performance metrics and add to history
     const playerResult = await db.collection('ams-player-data').updateOne(
-      { _id: new ObjectId(playerId) },
+      { id: playerId.toString() },
       {
         $set: {
           attributes,
@@ -62,7 +82,7 @@ export async function PATCH(request: NextRequest) {
               type: type || 'training'
             }]
           }
-        }as any
+        } as any
       }
     );
 
@@ -74,13 +94,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Also update parent session if this is an occurrence
-    const session = await db.collection('ams-sessions').findOne({ 
-      _id: new ObjectId(sessionId) 
-    });
+    let session;
+    if (ObjectId.isValid(sessionId)) {
+      session = await db.collection('ams-sessions').findOne({ _id: new ObjectId(sessionId) });
+    } else {
+      session = await db.collection('ams-sessions').findOne({ id: typeof sessionId === 'string' ? sessionId : Number(sessionId) });
+    }
 
     if (session?.parentSessionId) {
       await db.collection('ams-sessions').updateOne(
-        { _id: new ObjectId(session.parentSessionId) },
+        { id: session.parentSessionId },
         {
           $set: {
             [`playerMetrics.${playerId}`]: {

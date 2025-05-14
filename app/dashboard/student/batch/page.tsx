@@ -13,7 +13,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Star } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 export default function StudentBatches() {
   const { user } = useAuth();
@@ -22,13 +21,15 @@ export default function StudentBatches() {
   const [currentPlayer, setCurrentPlayer] = useState<any>(null);
   const [assignedPlayers, setAssignedPlayers] = useState<string[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [batchPlayers, setBatchPlayers] = useState<any[]>([]);
   const [coachData, setCoachData] = useState<{[key: string]: any}>({});
   const [selectedCoach, setSelectedCoach] = useState<any>(null);
   const [ratings, setRatings] = useState<{[key: string]: number}>({});
   const [showCoachProfile, setShowCoachProfile] = useState(false);
   const [studentsInfo, setStudentsInfo] = useState<{[key: string]: any}>({});
-  const [allBatches, setAllBatches] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<"my" | "all">("my");
+  const [batchCoachDetails, setBatchCoachDetails] = useState<{ [coachId: string]: any }>({});
+  const [allBatchCoachDetails, setAllBatchCoachDetails] = useState<{ [batchId: string]: { [coachId: string]: any } }>({});
+  const [coachProfileCache, setCoachProfileCache] = useState<{ [coachId: string]: any }>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,29 +51,25 @@ export default function StudentBatches() {
 
         setCurrentPlayer(currentPlayer);
 
-        // Use only the MongoDB _id string for batch player matching
-        const playerObjectId = currentPlayer._id?.toString();
+        // Use the player id string (starting with player_) for batch matching
+        const playerId = currentPlayer.id;
 
-        // Fetch all batches for this academy (do not filter by playerId in the API call)
+        // Fetch all batches for this academy
         const batchesResponse = await fetch(`/api/db/ams-batches?academyId=${user.academyId}`);
         if (!batchesResponse.ok) throw new Error('Failed to fetch batches');
         const batchesData = await batchesResponse.json();
 
-        // Only match by MongoDB _id string
+        // Only include batches where the player's id is present in the batch.players array
         const playerBatches = batchesData.data.filter((batch: any) =>
           Array.isArray(batch.players) &&
           batch.players.some((pid: any) =>
-            pid !== undefined &&
-            pid !== null &&
-            playerObjectId && pid.toString() === playerObjectId
+            typeof pid === "string" && pid === playerId
           )
         );
 
         setBatches(playerBatches);
 
-        // Save all batches for "All Batches" view
-        setAllBatches(batchesData.data);
-
+        // Fetch coach data for these batches (for batch list rendering)
         const coachIds = new Set<string>();
         playerBatches.forEach((batch: { coachId?: string; coachIds?: string[]; userId?: string }) => {
           if (batch.coachId) coachIds.add(batch.coachId);
@@ -153,8 +150,156 @@ export default function StudentBatches() {
     }
   }, [coachData]);
 
+  // Fetch batch players when a batch is selected
+  useEffect(() => {
+    const fetchBatchPlayers = async () => {
+      if (!selectedBatch || !selectedBatch.players || !Array.isArray(selectedBatch.players)) {
+        setBatchPlayers([]);
+        return;
+      }
+      // Only fetch if there are player ids starting with player_
+      const playerIds = selectedBatch.players.filter((id: string) => typeof id === "string" && id.startsWith("player_"));
+      if (playerIds.length === 0) {
+        setBatchPlayers([]);
+        return;
+      }
+      try {
+        const response = await fetch(`/api/db/ams-player-data/batch?ids=${playerIds.join(",")}`);
+        if (response.ok) {
+          const data = await response.json();
+          setBatchPlayers(data.data || []);
+        } else {
+          setBatchPlayers([]);
+        }
+      } catch {
+        setBatchPlayers([]);
+      }
+    };
+    fetchBatchPlayers();
+  }, [selectedBatch]);
+
+  useEffect(() => {
+    const fetchBatchCoachDetails = async () => {
+      if (!selectedBatch) {
+        setBatchCoachDetails({});
+        return;
+      }
+      let coachIds: string[] = [];
+      if (Array.isArray(selectedBatch.coachIds) && selectedBatch.coachIds.length > 0) {
+        coachIds = selectedBatch.coachIds;
+      } else if (selectedBatch.coachId) {
+        coachIds = [selectedBatch.coachId];
+      }
+      if (coachIds.length === 0) {
+        setBatchCoachDetails({});
+        return;
+      }
+      const details: { [coachId: string]: any } = {};
+      await Promise.all(
+        coachIds.map(async (coachId: string) => {
+          // Try to fetch from ams-users and coach-profile for richer info
+          try {
+            const [userRes, profileRes] = await Promise.all([
+              fetch(`/api/db/ams-users/${coachId}`),
+              fetch(`/api/db/coach-profile/${coachId}`)
+            ]);
+            const userData = await userRes.json();
+            const profileData = await profileRes.json();
+            let averageRating = "N/A";
+            const ratings = profileData.data?.ratings || [];
+            if (ratings.length > 0) {
+              averageRating = (
+                ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length
+              ).toFixed(1);
+            }
+            details[coachId] = {
+              id: coachId,
+              name: userData.data?.name || userData.data?.username || "Unknown Coach",
+              photoUrl: userData.data?.photoUrl || profileData.data?.photoUrl || "/placeholder.svg",
+              email: userData.data?.email || "Not available",
+              averageRating,
+            };
+          } catch {
+            details[coachId] = {
+              id: coachId,
+              name: "Unknown Coach",
+              photoUrl: "/placeholder.svg",
+              email: "Not available",
+              averageRating: "N/A"
+            };
+          }
+        })
+      );
+      setBatchCoachDetails(details);
+    };
+    fetchBatchCoachDetails();
+  }, [selectedBatch]);
+
+  useEffect(() => {
+    const fetchAllBatchCoachDetails = async () => {
+      const batchesToFetch = batches;
+      const details: { [batchId: string]: { [coachId: string]: any } } = {};
+
+      await Promise.all(
+        batchesToFetch.map(async (batch: any) => {
+          let coachIds: string[] = [];
+          if (Array.isArray(batch.coachIds) && batch.coachIds.length > 0) {
+            coachIds = batch.coachIds;
+          } else if (batch.coachId) {
+            coachIds = [batch.coachId];
+          }
+          if (coachIds.length === 0) {
+            details[batch.id] = {};
+            return;
+          }
+          const batchDetails: { [coachId: string]: any } = {};
+          await Promise.all(
+            coachIds.map(async (coachId: string) => {
+              try {
+                const [userRes, profileRes] = await Promise.all([
+                  fetch(`/api/db/ams-users/${coachId}`),
+                  fetch(`/api/db/coach-profile/${coachId}`)
+                ]);
+                const userData = await userRes.json();
+                const profileData = await profileRes.json();
+                let averageRating = "N/A";
+                const ratings = profileData.data?.ratings || [];
+                if (ratings.length > 0) {
+                  averageRating = (
+                    ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / ratings.length
+                  ).toFixed(1);
+                }
+                batchDetails[coachId] = {
+                  id: coachId,
+                  name: userData.data?.name || userData.data?.username || "Unknown Coach",
+                  photoUrl: userData.data?.photoUrl || profileData.data?.photoUrl || "/placeholder.svg",
+                  email: userData.data?.email || "Not available",
+                  averageRating,
+                };
+              } catch {
+                batchDetails[coachId] = {
+                  id: coachId,
+                  name: "Unknown Coach",
+                  photoUrl: "/placeholder.svg",
+                  email: "Not available",
+                  averageRating: "N/A"
+                };
+              }
+            })
+          );
+          details[batch.id] = batchDetails;
+        })
+      );
+      setAllBatchCoachDetails(details);
+    };
+    if (batches.length > 0) {
+      fetchAllBatchCoachDetails();
+    }
+  }, [batches]);
+
   const fetchCoachDetails = async (coachId: string) => {
     try {
+      // Fetch all coach, user, and credentials data
       const [coachResponse, userResponse, credentialsResponse] = await Promise.all([
         fetch(`/api/db/ams-coaches?id=${coachId}`),
         fetch(`/api/db/ams-users?userId=${coachId}`),
@@ -167,15 +312,38 @@ export default function StudentBatches() {
         credentialsResponse.json()
       ]);
 
+      // Normalize credentials to always be an array of objects with expected fields
+      let credentials: any[] = [];
+      if (Array.isArray(credentialsData.data)) {
+        credentials = credentialsData.data.map((cred: any) => ({
+          name: cred.title || cred.name || "Credential",
+          type: cred.type || "",
+          issueDate: cred.date || cred.issueDate || cred.issuedDate || "",
+          expiryDate: cred.expiryDate || cred.expiry || "",
+          issuingAuthority: cred.issuer || cred.issuingAuthority || "",
+          credentialId: cred.credentialId || cred.id || "",
+          status: cred.status || "",
+          description: cred.description || "",
+          document: cred.document || ""
+        }));
+      }
+
+      // Merge all coach, user, and credentials data for the profile dialog
       const combinedData = {
         ...coachData.data,
         ...userData.data,
-        credentials: credentialsData.data || [],
+        credentials,
         id: coachId,
         name: userData.data?.name || coachData.data?.name || "Unknown Coach",
         email: userData.data?.email || coachData.data?.email || "Not available",
         photoUrl: userData.data?.photoUrl || coachData.data?.photoUrl || "/placeholder.svg",
+        about: userData.data?.about || coachData.data?.about || "",
+        achievements: coachData.data?.achievements || [],
+        ratings: coachData.data?.ratings || [],
+        // Add any other fields you want to show in the profile dialog
       };
+
+      setCoachProfileCache(prev => ({ ...prev, [coachId]: combinedData }));
 
       return combinedData;
     } catch (error) {
@@ -194,6 +362,11 @@ export default function StudentBatches() {
 
   const handleCoachClick = async (coachId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (coachProfileCache[coachId]) {
+      setSelectedCoach(coachProfileCache[coachId]);
+      setShowCoachProfile(true);
+      return;
+    }
     const coachDetails = await fetchCoachDetails(coachId);
     setSelectedCoach(coachDetails);
     setShowCoachProfile(true);
@@ -233,17 +406,85 @@ export default function StudentBatches() {
     credentials: []
   });
 
+  const getCoachInfo = (coachId: string, batch?: any, idx?: number) => {
+    // Use batchCoachDetails if in batch detail dialog
+    if (selectedBatch && batchCoachDetails[coachId]) {
+      return batchCoachDetails[coachId];
+    }
+    // Use allBatchCoachDetails for batch list rendering
+    if (batch && allBatchCoachDetails[batch.id] && allBatchCoachDetails[batch.id][coachId]) {
+      return allBatchCoachDetails[batch.id][coachId];
+    }
+    // Use coachId to fetch from coachData, and if not present, fetch profile data directly
+    let coach = coachData[coachId];
+
+    // If not in cache, fetch synchronously (not recommended for production, but for parity with coach profile dialog)
+    // This is a workaround for the batch detail dialog to always show latest photo and averageRating
+    // In production, consider prefetching all coach profiles for batch coaches
+    if (!coach && typeof window !== "undefined") {
+      // Synchronous fetch is not possible, so just return fallback
+      return {
+        id: coachId,
+        name: batch?.coachNames?.[idx ?? 0] || batch?.coachName || "Unknown Coach",
+        photoUrl: batch?.coachPhotos?.[idx ?? 0] || batch?.coachPhotoUrl || "/placeholder.svg",
+        email: "Not available",
+        averageRating: "N/A"
+      };
+    }
+
+    // If coachData is present, but missing photo or averageRating, fetch from coach profile
+    let photoUrl = coach?.photoUrl;
+    let averageRating = coach?.averageRating;
+
+    // If missing, try to use ratings array to calculate average
+    if ((!averageRating || averageRating === "N/A") && Array.isArray(coach?.ratings) && coach.ratings.length > 0) {
+      averageRating = (
+        coach.ratings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / coach.ratings.length
+      ).toFixed(1);
+    }
+
+    // If still missing photo, fallback to batch-level photo
+    if (
+      (!photoUrl || photoUrl === "/placeholder.svg" || photoUrl === "/default-avatar.png") &&
+      batch &&
+      Array.isArray(batch.coachPhotos) &&
+      typeof idx === "number" &&
+      batch.coachPhotos[idx]
+    ) {
+      photoUrl = batch.coachPhotos[idx];
+    }
+
+    return {
+      id: coachId,
+      name: coach?.name || batch?.coachNames?.[idx ?? 0] || batch?.coachName || "Unknown Coach",
+      photoUrl: photoUrl || "/placeholder.svg",
+      email: coach?.email || "Not available",
+      averageRating: averageRating || "N/A"
+    };
+  };
+
   const getPlayerData = (playerId: string) => {
-    // Try to match by _id first, fallback to id if not found
-    const player = players.find(
+    // Try to match by id in batchPlayers first
+    const player = batchPlayers.find(
+      p => p.id && p.id.toString() === playerId.toString()
+    );
+    if (player) {
+      return {
+        name: player.name || "Unknown Player",
+        photoUrl: player.photoUrl || "/placeholder.svg",
+        position: player.position || "No position"
+      };
+    }
+    // fallback to global players list
+    const fallback = players.find(
       p =>
         (p._id && p._id.toString() === playerId.toString()) ||
         (p.id && p.id.toString() === playerId.toString())
     );
     return {
-      name: player?.name || "Unknown Player",
-      photoUrl: player?.photoUrl || "/placeholder.svg",
-      position: player?.position || "No position"
+      name: fallback?.name || "Unknown Player",
+      photoUrl: fallback?.photoUrl || "/placeholder.svg",
+      position: fallback?.position || "No position"
     };
   };
 
@@ -316,7 +557,7 @@ export default function StudentBatches() {
         setCoachData(prev => ({
           ...prev,
           [coachId]: {
-            ...prev[coachId],
+            ...prev,
             ...data.data,
             ratings: data.data.ratings || []
           }
@@ -389,41 +630,6 @@ export default function StudentBatches() {
     };
   };
 
-  const getCoachInfo = (coachId: string, batch?: any, idx?: number) => {
-    const coach = coachData[coachId];
-    if (coach && coach.name && coach.name !== "Unknown Coach") {
-      return {
-        id: coachId,
-        name: coach.name,
-        photoUrl: coach.photoUrl || "/placeholder.svg",
-        email: coach.email || "Not available"
-      };
-    }
-    // Try batch.coachNames and batch.coachPhotos for fallback
-    if (batch) {
-      let name = "Unknown Coach";
-      let photoUrl = "/placeholder.svg";
-      let email = "Not available";
-      if (Array.isArray(batch.coachNames) && typeof idx === "number" && batch.coachNames[idx]) {
-        name = batch.coachNames[idx];
-      } else if (batch.coachName) {
-        name = batch.coachName;
-      }
-      if (Array.isArray(batch.coachPhotos) && typeof idx === "number" && batch.coachPhotos[idx]) {
-        photoUrl = batch.coachPhotos[idx];
-      } else if (batch.coachPhotoUrl) {
-        photoUrl = batch.coachPhotoUrl;
-      }
-      return { id: coachId, name, photoUrl, email };
-    }
-    return {
-      id: coachId,
-      name: "Unknown Coach",
-      photoUrl: "/placeholder.svg",
-      email: "Not available"
-    };
-  };
-
   const getCoachDisplayName = (batch: any, idx?: number) => {
     if (batch.coachIds && Array.isArray(batch.coachIds) && batch.coachIds.length > 0) {
       const coachId = batch.coachIds[idx ?? 0];
@@ -464,19 +670,6 @@ export default function StudentBatches() {
       <div className="flex-1 p-8 overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold text-white">Batches</h1>
-          <ToggleGroup
-            type="single"
-            value={viewMode}
-            onValueChange={val => setViewMode(val as "my" | "all")}
-            className="bg-muted rounded"
-          >
-            <ToggleGroupItem value="my" aria-label="My Batches">
-              My Batches
-            </ToggleGroupItem>
-            <ToggleGroupItem value="all" aria-label="All Batches">
-              All Batches
-            </ToggleGroupItem>
-          </ToggleGroup>
         </div>
 
         <Table className="mt-6 cursor-pointer">
@@ -488,7 +681,7 @@ export default function StudentBatches() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(viewMode === "my" ? batches : allBatches).map((batch) => (
+            {batches.map((batch) => (
               <TableRow 
                 key={batch.id} 
                 onClick={() => setSelectedBatch(batch)}
@@ -528,15 +721,12 @@ export default function StudentBatches() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {viewMode === "my"
-                    ? <span title={players
-                        .filter(p => batch.players.includes(p._id?.toString()))
-                        .map(p => p.name)
-                        .join(", ")}>
-                        {getPlayersSummary(batch.players)}
-                      </span>
-                    : <span>{getStudentCount(batch)} student{getStudentCount(batch) !== 1 ? "s" : ""}</span>
-                  }
+                  <span title={players
+                      .filter(p => batch.players.includes(p._id?.toString()))
+                      .map(p => p.name)
+                      .join(", ")}>
+                    {getPlayersSummary(batch.players)}
+                  </span>
                 </TableCell>
               </TableRow>
             ))}
@@ -573,6 +763,9 @@ export default function StudentBatches() {
                               </Avatar>
                               <span className="font-medium underline text-white hover:text-gray-300">{coach.name}</span>
                               <span className="text-xs text-gray-500">{coach.email}</span>
+                              <span className="text-xs text-yellow-500 font-semibold">
+                                {coach.averageRating !== "N/A" ? `Avg. Rating: ${coach.averageRating}` : "No ratings yet"}
+                              </span>
                             </div>
                           );
                         })}
@@ -598,6 +791,9 @@ export default function StudentBatches() {
                               </Avatar>
                               <span className="font-medium underline text-white hover:text-gray-300">{coach.name}</span>
                               <span className="text-xs text-gray-500">{coach.email}</span>
+                              <span className="text-xs text-yellow-500 font-semibold">
+                                {coach.averageRating !== "N/A" ? `Avg. Rating: ${coach.averageRating}` : "No ratings yet"}
+                              </span>
                             </div>
                           );
                         })()}
@@ -641,134 +837,147 @@ export default function StudentBatches() {
         </Dialog>
 
         <Dialog open={showCoachProfile} onOpenChange={setShowCoachProfile}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Coach Profile</DialogTitle>
             </DialogHeader>
-            
-            <Tabs defaultValue="profile" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="credentials">Credentials</TabsTrigger>
-              </TabsList>
+            <div style={{ maxHeight: "65vh", overflowY: "auto" }}>
+              <Tabs defaultValue="profile" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="credentials">Credentials</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="profile" className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={selectedCoach?.photoUrl} />
-                    <AvatarFallback>{selectedCoach?.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h3 className="text-2xl font-bold">{selectedCoach?.name}</h3>
-                    <p className="text-gray-500">{selectedCoach?.email}</p>
-                    <div className="mt-2">
-                      <StarRating coachId={selectedCoach?.id} />
+                <TabsContent value="profile" className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={selectedCoach?.photoUrl} />
+                      <AvatarFallback>{selectedCoach?.name?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="text-2xl font-bold">{selectedCoach?.name}</h3>
+                      <p className="text-gray-500">{selectedCoach?.email}</p>
+                      <div className="mt-2">
+                        <StarRating coachId={selectedCoach?.id} />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>About</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>{selectedCoach?.about || 'No about information available'}</p>
-                  </CardContent>
-                </Card>
-
-                {selectedCoach?.achievements && selectedCoach.achievements.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Achievements</CardTitle>
+                      <CardTitle>About</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ul className="list-disc pl-4 space-y-2">
-                        {selectedCoach.achievements.map((achievement: string, index: number) => (
-                          <li key={index}>{achievement}</li>
-                        ))}
-                      </ul>
+                      <p>{selectedCoach?.about || 'No about information available'}</p>
                     </CardContent>
                   </Card>
-                )}
 
-                {selectedCoach?.ratings && selectedCoach.ratings.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Reviews</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {selectedCoach.ratings.slice(-3).map((rating: any, index: number) => {
-                          const studentInfo = getStudentInfo(rating);
-                          return (
-                            <div key={index} className="flex items-start space-x-4 p-4 bg-accent rounded-lg">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={studentInfo.photoUrl} alt={studentInfo.name} />
-                                <AvatarFallback>{studentInfo.name[0]}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <div className="flex justify-between items-center">
-                                  <p className="font-medium text-sm">{studentInfo.name}</p>
-                                  <div className="flex items-center">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                                    <span className="text-sm font-medium">{rating.rating}/5</span>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {new Date(rating.date).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="credentials" className="space-y-4">
-                {selectedCoach?.credentials && selectedCoach.credentials.length > 0 ? (
-                  selectedCoach.credentials.map((credential: any, index: number) => (
-                    <Card key={index}>
+                  {selectedCoach?.achievements && selectedCoach.achievements.length > 0 && (
+                    <Card>
                       <CardHeader>
-                        <CardTitle>{credential.name}</CardTitle>
+                        <CardTitle>Achievements</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Type:</span> {credential.type}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Issued Date:</span> {credential.issueDate}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Expiry Date:</span> {credential.expiryDate}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Issuing Authority:</span> {credential.issuingAuthority}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Credential ID:</span> {credential.credentialId}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            <span className="font-medium">Status:</span> {credential.status}
-                          </p>
-                          {credential.description && (
-                            <div className="mt-4">
-                              <span className="font-medium text-sm text-gray-500">Description:</span>
-                              <p className="text-sm text-gray-500 mt-1">{credential.description}</p>
-                            </div>
-                          )}
+                        <ul className="list-disc pl-4 space-y-2">
+                          {selectedCoach.achievements.map((achievement: string, index: number) => (
+                            <li key={index}>{achievement}</li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {selectedCoach?.ratings && selectedCoach.ratings.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Recent Reviews</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {selectedCoach.ratings.slice(-3).map((rating: any, index: number) => {
+                            const studentInfo = getStudentInfo(rating);
+                            return (
+                              <div key={index} className="flex items-start space-x-4 p-4 bg-accent rounded-lg">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={studentInfo.photoUrl} alt={studentInfo.name} />
+                                  <AvatarFallback>{studentInfo.name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-center">
+                                    <p className="font-medium text-sm">{studentInfo.name}</p>
+                                    <div className="flex items-center">
+                                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+                                      <span className="text-sm font-medium">{rating.rating}/5</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {new Date(rating.date).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </CardContent>
                     </Card>
-                  ))
-                ) : (
-                  <p className="text-center text-gray-500">No credentials available</p>
-                )}
-              </TabsContent>
-            </Tabs>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="credentials" className="space-y-4">
+                  {selectedCoach?.credentials && selectedCoach.credentials.length > 0 ? (
+                    selectedCoach.credentials.map((credential: any, index: number) => (
+                      <Card key={index}>
+                        <CardHeader>
+                          <CardTitle>{credential.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Type:</span> {credential.type}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Issued Date:</span> {credential.issueDate}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Expiry Date:</span> {credential.expiryDate}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Issuing Authority:</span> {credential.issuingAuthority}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Credential ID:</span> {credential.credentialId}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              <span className="font-medium">Status:</span> {credential.status}
+                            </p>
+                            {credential.description && (
+                              <div className="mt-4">
+                                <span className="font-medium text-sm text-gray-500">Description:</span>
+                                <p className="text-sm text-gray-500 mt-1">{credential.description}</p>
+                              </div>
+                            )}
+                            {credential.document && (
+                              <div className="mt-2">
+                                <a
+                                  href={credential.document}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 underline text-sm"
+                                >
+                                  View Document
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500">No credentials available</p>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

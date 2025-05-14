@@ -254,7 +254,8 @@ export default function MatchDay() {
             ...player,
             id: player._id || player.id,
             name: player.name || player.username || 'Unknown Player',
-            academyId: player.academyId || user.academyId
+            academyId: player.academyId || user.academyId,
+            position: player.position || player.attributes?.position || ""
           }));
           
           console.log('Setting players:', formattedPlayers.length);
@@ -379,8 +380,18 @@ export default function MatchDay() {
 
   const handleCreateMatch = async () => {
     try {
+      // Ensure players array contains player.id (starting with player_) instead of _id
+      const playerIds = newMatch.players.map(pid => {
+        const player = players.find(p => p.id === pid);
+        return typeof player?.id === 'string' && player.id.startsWith('player_') ? player.id : pid;
+      });
+
+      // Create a copy of newMatch without _id
+      const { _id, ...matchData } = newMatch;
+
       const match = {
-        ...newMatch,
+        ...matchData,
+        players: playerIds,
         academyId: user?.academyId,
         createdAt: new Date(),
         playerRatings: {},
@@ -402,7 +413,7 @@ export default function MatchDay() {
       if (result.success) {
         setMatches(prev => [...prev, result.data]);
         setNewMatch({
-          _id: "",
+          _id: "", // This is fine for local state, but will be stripped on next submit
           date: new Date(),
           opponent: "",
           venue: "",
@@ -988,8 +999,11 @@ export default function MatchDay() {
         }));
       }
 
+      const position = player.position || player.attributes?.position || "N/A";
+
       return {
         ...player,
+        position,
         stats: playerStats[player.id.toString()] || {
           matchPoints: { 
             current: latestMatchPoints,
@@ -1072,7 +1086,7 @@ export default function MatchDay() {
                   return (
                     <TableRow key={player.id}>
                       <TableCell className="font-medium">{player.name}</TableCell>
-                      <TableCell>{player.attributes?.position ?? 'N/A'}</TableCell>
+                      <TableCell>{player.position || player.attributes?.position || "N/A"}</TableCell>
                       <TableCell>{getFormattedValue(currentPoints)}</TableCell>
                       <TableCell>
                         <div className="space-y-2">
@@ -1352,7 +1366,7 @@ export default function MatchDay() {
                   {renderNewMatchForm()}
                 </div>
               </ScrollArea>
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-0 pb-0 px-0 py-0 ">
                 <Button onClick={handleCreateMatch}>Create Match</Button>
               </div>
             </DialogContent>

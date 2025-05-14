@@ -359,11 +359,14 @@ export default function BatchesPage() {
           name: coach.name,
         }));
 
+      // Only use player ids that start with 'player_'
+      const filteredPlayerIds = selectedPlayers.filter(pid => pid.startsWith('player_'));
+
       const batchData = {
         name: newBatchName.trim(),
         coachIds: selectedCoachData.map(c => c.id), // Use only the user IDs
         coachNames: selectedCoachData.map(c => c.name), // Store names separately
-        players: selectedPlayers,
+        players: filteredPlayerIds, // Only player_ ids
         academyId: user.academyId,
         createdBy: user.id,
         createdAt: new Date().toISOString(),
@@ -785,7 +788,7 @@ export default function BatchesPage() {
               <DialogTitle>Coach Details</DialogTitle>
             </DialogHeader>
             {selectedCoachDetails && (
-              <div className="space-y-6 p-4">
+              <div className="space-y-6 p-4" style={{ maxHeight: "70vh", overflowY: "auto" }}>
                 <div className="flex items-center gap-4 border-b pb-4">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={selectedCoachDetails.photoUrl} />
